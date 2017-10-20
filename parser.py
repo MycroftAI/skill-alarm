@@ -1,38 +1,9 @@
-# Copyright 2016 Mycroft AI, Inc.
-#
-# This file is part of Mycroft Core.
-#
-# Mycroft Core is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# Mycroft Core is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with Mycroft Core.  If not, see <http://www.gnu.org/licenses/>.
-
-import time
-import yaml
-from alsaaudio import Mixer
-from datetime import datetime, timedelta
-from os.path import dirname, join
-
-from mycroft import MycroftSkill
-from mycroft.util import play_mp3
-
 from difflib import SequenceMatcher
 import re
 from abc import ABCMeta, abstractmethod
 from datetime import datetime
 
 from enum import Enum, unique
-
-from mycroft.util.log import LOG
-
 
 @unique
 class TimeType(Enum):
@@ -48,8 +19,7 @@ class TimeType(Enum):
         return num_sec / self.value
 
 
-class MycroftParser(object):
-    __metaclass__ = ABCMeta
+class MycroftParser(metaclass=ABCMeta):
     """Helper class to parse common parameters like duration out of strings"""
     def __init__(self):
         pass
@@ -176,7 +146,7 @@ class Parser(MycroftParser):
         regex_str = ('(((' + '|'.join(k for k, v in self.units) + r'|[0-9])+[ \-\t]*)+)(' +
                      '|'.join(name for ttype, names in self.ttype_names_s.items() for name in
                               names) + ')s?')
-        dur, conf = 0, 0.0
+        dur = 0
         matches = tuple(re.finditer(regex_str, string))
         if len(matches) == 0:
             raise ValueError
@@ -190,52 +160,28 @@ class Parser(MycroftParser):
             dur += ttype_typ.to_sec(num)
         return dur, conf
 
-    def time(self, time_str, morning=False, evening=False):
-        LOG.info('TIME')
-        if 'am' in time_str.lower():
-            morning = True
+    def time(self, time_str):
+        morning, evening = False, False
         if 'pm' in time_str.lower():
             evening = True
-        LOG.info(time_str)
         m = re.search('[0-9]{1,2}:[0-9]{2}', time_str)
-        LOG.info(m)
         if m:
             match = m.group(0)
             hour, minute = match.split(':')
         else:
-            m = re.search('[0-9]{0,2}', time_str)
+            m = re.search('[0-9]{1,2}', time_str)
             if m:
                 match = m.group(0)
                 hour, minute = match, '0'
             else:
                 raise ValueError
-        now = datetime.now()
-        day, hour, minute = 0, int(hour), int(minute)
-        LOG.info('HOUR:' + str(hour))
-        LOG.info(str(hour) + ":" + str(minute))
+        hour, minute = int(hour), int(minute)
         if evening:
             hour += 12
-        dh = hour - now.hour
-        if dh < 0:
-            hour += 24
-        if not evening and not morning:
-            dh = hour - now.hour
-            LOG.info('DH:' + str(dh))
-            if dh > 6:
-                hour -= 12
-
-        elif dh == 0:
-            dm = minute - now.minute
-            if dm < 0:
-                hour += 24
-
-        if hour >= 24:
-            day += 1
-            hour -= 24
-        LOG.info(hour)
 
         time_str = time_str.replace(match, '')
-        return time_str, datetime(now.year, now.month, now.day + day, hour, minute)
+        now = datetime.now()
+        return time_str, datetime(now.year, now.month, now.day, hour, minute)
 
     def days(self, time_str):
         for day in self.day_numbers:
@@ -255,9 +201,9 @@ class Parser(MycroftParser):
                 return time_str.replace(day, ''), datetime(yr, mo, day)
         return time_str, datetime(yr, mo, datetime.today().day)
 
-    def date(self, time_str, morning=False, evening=False):
+    def date(self, time_str):
         time_str, day = self.days(time_str)
-        time_str, time = self.time(time_str, morning, evening)
+        time_str, time = self.time(time_str)
         t = datetime.now()
         t = datetime(t.year, t.month, day.day, time.hour, time.minute)
         return time_str, t
@@ -353,142 +299,3 @@ class Parser(MycroftParser):
              ttype, amount in quantities])
         complete_str = ' and '.join(complete_str.rsplit(', ', 1))
         return complete_str
-
-
-class AlarmSkill(MycroftSkill):
-
-    def __init__(self):
-        super(AlarmSkill, self).__init__()
-        self.alarm_on = False
-        self.max_delay = self.config['max_delay']
-        self.repeat_time = self.config['repeat_time']
-        self.extended_delay = self.config['extended_delay']
-        self.file_path = join(dirname(__file__), self.config['filename'])
-        self.parser = Parser()
-
-    def initialize(self):
-        self.register_intent_file('stop.intent', self.__handle_stop)
-        self.register_intent_file('set.morning.intent', self.set_morning)
-        self.register_intent_file('set.sunrise.intent', self.set_sunrise)
-        self.register_intent_file('set.recurring.intent', self.set_recurring)
-        self.register_intent_file('stop.intent', self.stop)
-        self.register_intent_file('set.time.intent', self.set_time)
-        self.register_intent_file('delete.all.intent', self.delete_all)
-        self.register_intent_file('delete.intent', self.delete)
-        self.register_entity_file('time.entity')
-        self.register_entity_file('length.entity')
-        self.register_entity_file('daytype.entity')
-        self.register_entity_file('exceptdaytype.entity')
-
-    def create_in_delta_seconds(self, seconds):
-        hours, seconds = divmod(seconds, 60 * 60)
-        minutes = seconds / 60
-        data = {
-            'hours': hours,
-            'minutes': minutes
-        }
-
-        hm = ''
-        if hours > 0:
-            hm += 'h'
-        if minutes > 0:
-            hm += 'm'
-        if hm == '':
-            hm = 'm'
-
-        self.speak_dialog('alarm.set.' + hm, data=data)
-
-    def set_for_length(self, dur_str):
-        seconds, conf = self.parser.duration(dur_str)
-        self.create_in_delta_seconds(seconds)
-
-    def set_for_time(self, time_str, morning=False, evening=False):
-        time_str, dt = self.parser.date(time_str, morning, evening)
-        self.create_in_delta_seconds((dt - datetime.now()).seconds)
-
-    def set_time(self, message):
-        try:
-            if 'time' in message.data:
-                return self.set_for_time(message.data['time'])
-            elif 'length' in message.data:
-                return self.set_for_length(message.data['length'])
-        except ValueError:
-            pass
-        self.speak_dialog('no.time.found')
-
-    def set_morning(self, message):
-        try:
-            if 'time' in message.data:
-                return self.set_for_time(message.data['time'], morning=True)
-            elif 'length' in message.data:
-                return self.set_for_length(message.data['length'])
-        except ValueError:
-            pass
-        self.speak_dialog('no.time.found')
-
-    def set_sunrise(self, message):
-        pass
-
-    def set_recurring(self, message):
-        pass
-
-    def delete_all(self, message):
-        pass
-
-    def delete(self, message):
-        pass
-
-    def load_data(self):
-        try:
-            with self.file_system.open(self.PENDING_TASK, 'r') as f:
-                self.data = yaml.safe_load(f)
-            if not self.data:
-                raise ValueError
-        except:
-            self.data = {}
-
-    def load_repeat_data(self):
-        try:
-            with self.file_system.open(self.REPEAT_TASK, 'r') as f:
-                self.repeat_data = yaml.safe_load(f)
-                assert self.repeat_data
-        except:
-            self.repeat_data = {}
-
-    def __handle_stop(self, message):
-        if self.alarm_on:
-            self.speak_dialog('alarm.off')
-        self.alarm_on = False
-
-    def notify(self, timestamp):
-        with self.LOCK:
-            if self.data.__contains__(timestamp):
-                volume = None
-                self.alarm_on = True
-                delay = self.__calculate_delay(self.max_delay)
-
-                while self.alarm_on and datetime.now() < delay:
-                    play_mp3(self.file_path).communicate()
-                    self.speak_dialog('alarm.stop')
-                    time.sleep(self.repeat_time + 2)
-                    if not volume and datetime.now() >= delay:
-                        mixer = Mixer()
-                        volume = mixer.getvolume()[0]
-                        mixer.setvolume(100)
-                        delay = self.__calculate_delay(self.extended_delay)
-                if volume:
-                    Mixer().setvolume(volume)
-                self.remove(timestamp)
-                self.alarm_on = False
-                self.save()
-
-    @staticmethod
-    def __calculate_delay(seconds):
-        return datetime.now() + timedelta(seconds=seconds)
-
-    def stop(self):
-        self.__handle_stop(None)
-
-
-def create_skill():
-    return AlarmSkill()

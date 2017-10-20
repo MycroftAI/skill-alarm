@@ -1,0 +1,13 @@
+wake me up (at {time} | for {time} | ) every {daytype} (at {time} | for {time} | ) (except on the {exceptdaytype} | ) (called {label} | ).
+wake me up (at {time} | for {time} | ) every {daytype} (at {time} | for {time} | ) (except for the {exceptdaytype} | ).
+wake me up (at {time} | for {time} | ) every {daytype} (at {time} | for {time} | ) (except on {exceptdaytype} | ).
+wake me up (at {time} | for {time} | ) every {daytype} (at {time} | for {time} | ) (except for {exceptdaytype} | ).
+
+wake me up (at {time} | for {time} | ) every {daytype} (at {time} | for {time} | ) (except {exceptdaytype} | ).
+
+(set | create | make) an alarm (clock | ) (at {time} | for {time} | ) every {daytype} (at {time} | for {time} | ) (except on the {exceptdaytype} | ) (called {label} | ).
+(set | create | make) an alarm (clock | ) (at {time} | for {time} | ) every {daytype} (at {time} | for {time} | ) (except for the {exceptdaytype} | ).
+(set | create | make) an alarm (clock | ) (at {time} | for {time} | ) every {daytype} (at {time} | for {time} | ) (except on {exceptdaytype} | ).
+(set | create | make) an alarm (clock | ) (at {time} | for {time} | ) every {daytype} (at {time} | for {time} | ) (except for {exceptdaytype} | ).
+
+(set | create | make) an alarm (clock | ) (at {time} | for {time} | ) every {daytype} (at {time} | for {time} | ) (except {exceptdaytype} | ).
