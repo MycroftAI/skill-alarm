@@ -1,3 +1,3 @@
-(day | weekday | weekend)
+(day | weekday | weekdays | weekend | weekends | tomorrow)
 (monday | mondays | tuesday | tuesdays | wednesday | wednesdays | thursday | thursdays | friday | fridays | saturday | saturdays | sunday | sundays)
 (monday | mondays | tuesday | tuesdays | wednesday | wednesdays | thursday | thursdays | friday | fridays | saturday | saturdays | sunday | sundays) and (monday | mondays | tuesday | tuesdays | wednesday | wednesdays | thursday | thursdays | friday | fridays | saturday | saturdays | sunday | sundays)
