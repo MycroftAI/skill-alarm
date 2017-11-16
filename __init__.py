@@ -61,13 +61,14 @@ class AlarmSkill(MycroftSkill):
 
         if self.settings.get("alarms", None) is None:
             self.settings["alarms"] = []
+        else:
+            self._load_alarms()
 
     def parse_message_data(self, message_data):
         daytype = message_data.get("daytype", "").replace(" ", "")
         time = message_data.get("time", "").replace(" ", "")
         length = message_data.get("length", "")
         ampm = message_data.get("ampm", "").replace(" ", "")
-
         name = None
 
         # TODO think about recurring alarms
@@ -101,18 +102,37 @@ class AlarmSkill(MycroftSkill):
         alarm_object['arrow_object'] = arrow_object
         return alarm_object
 
-    def _schedule_alarm_event(self, alarm_object):
+    def save_alarm(self, alarm_object):
+        alarm = (alarm_object['name'], str(alarm_object['arrow_object']))
+        self.settings['alarms'].append(alarm)
+
+    def remove_alarm(self, alarm_name):
+        for index, alarms in enumerate(self.settings['alarms']):
+            if alarms[0] == alarm_name:
+                self.settings['alarms'].pop(index)
+
+    def _load_alarms(self):
+        for alarms in self.settings['alarms']:
+            alarm_name = alarms[0]
+            alarm_time = arrow.get(alarms[1])
+            now = arrow.now()
+            if alarm_time.timestamp > now.timestamp:
+                self._schedule_alarm_event(alarm_name, alarm_time)
+            else:
+                self.remove_alarm(alarm_name)
+
+    def _schedule_alarm_event(self, alarm_name, alarm_time):
         LOG.info("scheduling alarm")
-        # TODO: check to see if alarm already exist
-        alarm_time = alarm_object['arrow_object'].datetime
-        alarm_name = alarm_object['name']
         self.schedule_event(self.handle_end_timer, alarm_time,
                             data=alarm_name, name=alarm_name)
 
     def schedule_alarm(self, message_data):
         alarm_object = self.create_alarm_object(message_data)
-        self._schedule_alarm_event(alarm_object)
+        alarm_time = alarm_object['arrow_object'].datetime
+        alarm_name = alarm_object['name']
+        self._schedule_alarm_event(alarm_name, alarm_time)
         self.speak_alarm(alarm_object)
+        self.save_alarm(alarm_object)
 
     def speak_alarm(self, alarm_object):
         self.speak("Ok. Setting an alarm for {}".format(alarm_object["name"]))
@@ -128,6 +148,8 @@ class AlarmSkill(MycroftSkill):
         self.speak("{} alarm is up".format(alarm_name))
         wait_while_speaking()
         self.notify()
+        # TODO: how to handle recurrent
+        self.remove_alarm(alarm_name)
 
     def cancel_timer(self, timer_name):
         """ cancel timer through event shceduler
@@ -170,7 +192,7 @@ class AlarmSkill(MycroftSkill):
         pass
 
     @staticmethod
-    def notify(repeat=3):
+    def notify():
         path = join(abspath(dirname(__file__)), 'timerBeep.mp3')
         play_mp3(path)
 
