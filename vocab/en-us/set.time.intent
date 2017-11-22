@@ -1,6 +1,8 @@
 wake me up (at {time}| for {time}| ) ({ampm} |) every {daytype} (at {time}| for {time}| ) ({ampm} |) (called {label} | ).
 (set | create | make) an alarm (clock | ) (at {time}| for {time}| ) ({ampm} |) every {daytype} (at {time}| for {time}| ) ({ampm} |) (called {label} | ).
-(set | create | make) an alarm (clock | ) (at {time}| for {time}| ) ({ampm} |)  on (the|) ({ampm} |) {daytype}.
-(set | create | make) an alarm (clock | ) (at {time}| for {time}| ) ({ampm} |) ({daytype}|)
+(set | create | make) (an|) alarm (clock | ) (at {time}| for {time}| ) ({ampm} |)  on (the|) ({ampm} |) (this| for|) {daytype}.
+(set | create | make) (an|) alarm (clock | ) (at {time}| for {time}| ) ({ampm} |) (this|) ({daytype}|)
+(set | create | make) (an|a|) {daytype} alarm (clock | ) (at {time}| for {time}| ) ({ampm} |)
+(set | create | make) (an|a|) alarm (clock | ) ({daytype}|) (at {time}| for {time}| ) ({ampm} |)
 wake me up in {length}.
 wake me up in {length} from now.

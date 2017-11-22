@@ -1,1 +1,2 @@
-arrow==0.10.0
+git+git://github.com/crsmithdev/arrow.git@b33925e9ce55c3544afcb66a0ffb205593b49ab7
+backports.functools_lru_cache
