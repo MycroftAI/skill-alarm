@@ -37,20 +37,19 @@ class AlarmSkill(MycroftSkill):
         self.stop_notify = False
         self.allow_notify = False
         self.converse_context = {}
+        self._days = ["monday", "tuesday", "wednesday", "thursday",
+                      "friday", "saturday", "sunday"]
 
     def initialize(self):
-        # self.register_intent_file('set.morning.intent', self.set_morning)
-        # self.register_intent_file('set.sunrise.intent', self.set_sunrise)
-        # self.register_intent_file('delete.all.intent', self.delete_all)
-        # self.register_entity_file('exceptdaytype.entity')
-
         # using adapt because padatious seems to
         # not pick this up for some reason
-        status_intent = IntentBuilder("status.alarm.intent"). \
-            require("status").require("alarm").build()
-        self.register_intent(status_intent, self.handle_status)
+        # status_intent = IntentBuilder("status.alarm.intent"). \
+        #     require("status").require("alarm"). \
+        #     optionally("Time").build()
+        # self.register_intent(status_intent, self.handle_status)
 
         # using padatious
+        self.register_intent_file('alarm.status.intent', self.handle_status)
         self.register_intent_file('delete.intent', self.handle_delete)
         self.register_intent_file('set.recurring.intent',
                                   self.handle_set_recurring)
@@ -76,7 +75,6 @@ class AlarmSkill(MycroftSkill):
 
     def remove_alarm(self, alarm_name):
         """ removes alarm from settings """
-        # TODO: deal with recurring
         for index, alarm_object in enumerate(self.settings['alarms']):
             if alarm_object["name"] == alarm_name:
                 self.settings['alarms'].pop(index)
@@ -125,7 +123,6 @@ class AlarmSkill(MycroftSkill):
                'morning' in ampm.lower():
                 ampm = 'a.m.'
 
-        # TODO think about recurring alarms
         recurring_str = "" if recurring is False else "recurring "
         if time != "":
             name = "{}{} {} {}".format(
@@ -134,7 +131,6 @@ class AlarmSkill(MycroftSkill):
         elif length is not None:
             name = "{}".format(length)
 
-        # TODO: deal with weekend, weekdays, etc
         _days = ["monday", "tuesday", "wednesday", "thursday",
                  "friday", "saturday", "sunday"]
 
@@ -209,6 +205,34 @@ class AlarmSkill(MycroftSkill):
         self.speak("Okay. Setting a {} alarm"
                    .format(alarm_object["name"]))
 
+    def get_nearest_date_from_now(self, arrow_objects):
+        """ find nearest date from now to the arrow objects
+
+            Args:
+                arrow_objects (list): list of arrow date time objects
+
+            return:
+                arw (arrow): arrow date time object
+                index (int): index of arrow object found
+        """
+        arrow_objects = [arrow.get(arw) for arw in arrow_objects]
+        smallest_time_delta = {
+            "arrow_object": None,
+            "index": None,
+            "time": float("inf")
+            }
+        now = arrow.now()
+        for i, arw in enumerate(arrow_objects):
+            diff = abs(arw.timestamp - now.timestamp)
+            if diff < smallest_time_delta["time"]:
+                smallest_time_delta["arrow_object"] = arw
+                smallest_time_delta["time"] = diff
+                smallest_time_delta["index"] = i
+
+        arw = smallest_time_delta['arrow_object']
+        index = smallest_time_delta['index']
+        return arw, index
+
     def handle_end_timer(self, message):
         """ callback for _schedule_alarm_event scheduled_event()
 
@@ -226,29 +250,12 @@ class AlarmSkill(MycroftSkill):
         for alarm_object in self.settings['alarms']:
             if alarm_object['name'] == alarm_name[:-1]:
                 if alarm_object['recurring'] is True:
-                    arrow_objects = alarm_object['arrow_objects']
-                    arrow_objects = [arrow.get(arw) for arw in arrow_objects]
-                    obj_with_smallest_time_delta = {
-                        "arrow_object": None,
-                        "index": None,
-                        "time": float("inf")
-                        }
-                    # the time we want to re-schedule
-                    # should be the closest time to now
-                    now = arrow.now()
-                    for i, arw in enumerate(arrow_objects):
-                        diff = abs(arw.timestamp - now.timestamp)
-                        if diff < obj_with_smallest_time_delta["time"]:
-                            obj_with_smallest_time_delta["arrow_object"] = arw
-                            obj_with_smallest_time_delta["time"] = diff
-                            obj_with_smallest_time_delta["index"] = i
-
-                    arrow_time_to_schedule = \
-                        obj_with_smallest_time_delta["arrow_object"]
-                    arrow_object = arrow_time_to_schedule.shift(weeks=+1)
+                    nearest_arrow, index = \
+                        self.get_nearest_date_from_now(
+                            alarm_object['arrow_objects'])
+                    arrow_object = nearest_arrow.shift(weeks=+1)
                     time = arrow_object.datetime
                     self._schedule_alarm_event(alarm_name, time)
-                    index = obj_with_smallest_time_delta["index"]
                     if index is not None:
                         alarm_object['arrow_objects'].pop(index)
                         alarm_object['arrow_objects'].append(str(arrow_object))
@@ -310,21 +317,62 @@ class AlarmSkill(MycroftSkill):
     def handle_status(self, message):
         """ Callback for status alarm intent """
         LOG.info(message.data)
-        if len(self.settings['alarms']) == 0:
+        alarm_object = self.parse_message_data(message.data)
+        alarms = self.settings['alarms']
+        LOG.info(alarm_object)
+        # no alarms
+        if len(alarms) == 0:
             self.speak_dialog('alarm.status')
+        # indentified time entity
+        elif 'time' in message.data:
+            name = alarm_object['name']
+            similar_alarms = []
+            for alarm in alarms:
+                if name in alarm['name']:
+                    similar_alarms.append(alarm)
+            # found a matching alarm
+            if len(similar_alarms) == 1:
+                alarm = similar_alarms[0]
+                # found arrow object for alarm
+                if len(alarm['arrow_objects']) == 1:
+                    humanized = arrow.get(alarm['arrow_objects'][0]).humanize()
+                    speak_string = "You're {} alarm is set to to go off {}" \
+                        .format(name, humanized)
+                    self.speak(speak_string)
+                # if matching alarm has multiple arrow object
+                # i.e alarm that was set for same time multiple days
+                elif len(alarm['arrow_objects']) > 1:
+                    speak_string = "you have multiple alarms set for {}. " \
+                        .format(alarm['time'])
+                    for day in alarm['days']:
+                        speak_string += "one on {}. ".format(day)
+                    LOG.info(alarm)
+                    nearest_arw, _ = self.get_nearest_date_from_now(
+                        alarm['arrow_objects'])
+                    day = self._days[nearest_arw.weekday()]
+                    speak_string += "The nearest time is on {} which is" \
+                                    .format(day)
+                    speak_string += " {}".format(nearest_arw.humanize())
+                    self.speak(speak_string)
+            elif len(similar_alarms) > 1:
+                self.speak("you have multiple alarms similar to that")
+            elif len(similar_alarms) == 0:
+                self.speak(
+                    "You do not have any alarms set for {}".format(name))
+        # did not find the alarm specified in utterance
         else:
             alarms = self.settings['alarms']
             num_of_alarms = len(alarms)
             names = [alarm['name'] for alarm in alarms]
             speak_string = "you have {} active alarms.".format(num_of_alarms)
             for i, name in enumerate(names):
-                if (i + 1) == len(names):
-                    speak_string += " and {}".format(name)
-                else:
-                    speak_string += " {}.".format(name)
+                speak_string += " one for {}.".format(name)
             self.speak(speak_string)
 
     def delete_all(self, message):
+        pass
+
+    def handle_change(self, message):
         pass
 
     # TODO: converse for multiple alarms

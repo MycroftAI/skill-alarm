@@ -1,0 +1,16 @@
+status of alarm
+what alarms do I have
+do i have any alarms
+do i have any alarms set
+when's my next alarm
+status of alarms
+status of {time} ({ampm}|) alarm
+status of {time} ({ampm}|) {daytype} alarm
+status of my {time} ({ampm}|) alarm
+status of my {time} ({ampm}|) {daytype} alarm
+how much time is left on my {time} ({ampm}|) alarm
+how much time is left on my {time} ({ampm}|) {daytype} alarm
+time left on my {time} ({ampm}|) alarm
+time left on my {time} ({ampm}|) {daytype} alarm
+time left on my {length} alarm
+how much time left on my {length} alarmhow much time left on my {length} alarm
