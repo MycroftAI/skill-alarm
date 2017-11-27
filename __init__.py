@@ -25,6 +25,7 @@ from mycroft import MycroftSkill
 from mycroft.util import play_mp3
 from mycroft.audio import wait_while_speaking
 from mycroft.util.log import LOG
+from adapt.intent import IntentBuilder
 
 
 class AlarmSkill(MycroftSkill):
@@ -41,8 +42,16 @@ class AlarmSkill(MycroftSkill):
         # self.register_intent_file('set.morning.intent', self.set_morning)
         # self.register_intent_file('set.sunrise.intent', self.set_sunrise)
         # self.register_intent_file('delete.all.intent', self.delete_all)
-        # self.register_intent_file('delete.intent', self.delete)
+        self.register_intent_file('delete.intent', self.delete)
         # self.register_entity_file('exceptdaytype.entity')
+
+        # using adapt because padatious seems to
+        # not pick this up for some reason
+        status_intent = IntentBuilder("status.alarm.intent"). \
+            require("status").require("alarm").build()
+        self.register_intent(status_intent, self.handle_status)
+
+        # using padatious
         self.register_intent_file('set.recurring.intent',
                                   self.handle_set_recurring)
         self.register_intent_file('stop.intent', self.stop)
@@ -200,11 +209,6 @@ class AlarmSkill(MycroftSkill):
         self.speak("Okay. Setting a {} alarm"
                    .format(alarm_object["name"]))
 
-    def create_message_data_recurring(self, alarm_object):
-        LOG.info("inside recurring function")
-        # self.schedule_alarm
-        pass
-
     def handle_end_timer(self, message):
         """ callback for _schedule_alarm_event scheduled_event()
 
@@ -288,8 +292,7 @@ class AlarmSkill(MycroftSkill):
             self.speak_dialog('alarm.error')
 
     def handle_set_recurring(self, message):
-        """ Callback for set recurring time intent.
-        """
+        """ Callback for set recurring time intent. """
         LOG.info(message.data)
         message.data['recurring'] = True
         if 'time' in message.data:
@@ -303,11 +306,49 @@ class AlarmSkill(MycroftSkill):
         else:
             self.speak_dialog('alarm.error')
 
+    # TODO: speak alarm in chronological order
+    def handle_status(self, message):
+        """ Callback for status time intent """
+        LOG.info(message.data)
+        if len(self.settings['alarms']) == 0:
+            self.speak_dialog('alarm.status')
+        else:
+            alarms = self.settings['alarms']
+            num_of_alarms = len(alarms)
+            names = [alarm['name'] for alarm in alarms]
+            speak_string = "you have {} active alarms.".format(num_of_alarms)
+            for i, name in enumerate(names):
+                if (i + 1) == len(names):
+                    speak_string += " and {}".format(name)
+                else:
+                    speak_string += " {}.".format(name)
+            self.speak(speak_string)
+
     def delete_all(self, message):
         pass
 
+    # TODO: converse for multiple alarms
     def delete(self, message):
-        pass
+        LOG.info(message.data)
+        alarm_object = self.parse_message_data(message.data)
+        alarm_to_delete = alarm_object['name']
+        alarms = self.settings['alarms']
+
+        delete_object = []
+        for alarm in alarms:
+            alarm_name = alarm['name']
+            if alarm_to_delete.lower() in alarm_name.lower():
+                delete_object.append(alarm_name)
+
+        if len(delete_object) > 1:
+            self.speak("you have {} alarms similar to that. " +
+                       "which one are you referring too.")
+        elif len(delete_object) == 1:
+            self.speak("canceling {} alarm".format(alarm_to_delete))
+            self.remove_alarm(delete_object[0])
+        else:
+            self.speak(
+                "I can not find an alarm set for {}".format(alarm_to_delete))
 
     def notify(self, repeat=6):
         """ recursively calls it's self to play alarm mp3
@@ -352,7 +393,7 @@ class AlarmSkill(MycroftSkill):
             utt = utterances[0]
             prev_message_data = self.converse_context.get('data')
             if 'pm' in utt.lower() or 'p.m' in utt.lower() or \
-               'evening' in utt.lower:
+               'evening' in utt.lower():
                 prev_message_data["ampm"] = 'p.m.'
             elif 'am' in utt.lower() or 'a.m' in utt.lower() or \
                  'morning' in utt.lower():
