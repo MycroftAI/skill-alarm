@@ -41,14 +41,6 @@ class AlarmSkill(MycroftSkill):
                       "friday", "saturday", "sunday"]
 
     def initialize(self):
-        # using adapt because padatious seems to
-        # not pick this up for some reason
-        # status_intent = IntentBuilder("status.alarm.intent"). \
-        #     require("status").require("alarm"). \
-        #     optionally("Time").build()
-        # self.register_intent(status_intent, self.handle_status)
-
-        # using padatious
         self.register_intent_file('alarm.status.intent', self.handle_status)
         self.register_intent_file('delete.intent', self.handle_delete)
         self.register_intent_file('set.recurring.intent',
