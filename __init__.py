@@ -42,7 +42,6 @@ class AlarmSkill(MycroftSkill):
         # self.register_intent_file('set.morning.intent', self.set_morning)
         # self.register_intent_file('set.sunrise.intent', self.set_sunrise)
         # self.register_intent_file('delete.all.intent', self.delete_all)
-        self.register_intent_file('delete.intent', self.delete)
         # self.register_entity_file('exceptdaytype.entity')
 
         # using adapt because padatious seems to
@@ -52,6 +51,7 @@ class AlarmSkill(MycroftSkill):
         self.register_intent(status_intent, self.handle_status)
 
         # using padatious
+        self.register_intent_file('delete.intent', self.handle_delete)
         self.register_intent_file('set.recurring.intent',
                                   self.handle_set_recurring)
         self.register_intent_file('stop.intent', self.stop)
@@ -308,7 +308,7 @@ class AlarmSkill(MycroftSkill):
 
     # TODO: speak alarm in chronological order
     def handle_status(self, message):
-        """ Callback for status time intent """
+        """ Callback for status alarm intent """
         LOG.info(message.data)
         if len(self.settings['alarms']) == 0:
             self.speak_dialog('alarm.status')
@@ -328,7 +328,8 @@ class AlarmSkill(MycroftSkill):
         pass
 
     # TODO: converse for multiple alarms
-    def delete(self, message):
+    def handle_delete(self, message):
+        """" Callback for delete alarm intent """
         LOG.info(message.data)
         alarm_object = self.parse_message_data(message.data)
         alarm_to_delete = alarm_object['name']
