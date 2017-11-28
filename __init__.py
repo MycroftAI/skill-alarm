@@ -26,6 +26,7 @@ from mycroft.util import play_mp3
 from mycroft.audio import wait_while_speaking
 from mycroft.util.log import LOG
 from adapt.intent import IntentBuilder
+from mycroft import intent_file_handler
 
 
 class AlarmSkill(MycroftSkill):
@@ -41,17 +42,7 @@ class AlarmSkill(MycroftSkill):
                       "friday", "saturday", "sunday"]
 
     def initialize(self):
-        self.register_intent_file('alarm.status.intent', self.handle_status)
-        self.register_intent_file('delete.intent', self.handle_delete)
-        self.register_intent_file('set.recurring.intent',
-                                  self.handle_set_recurring)
-        self.register_intent_file('stop.intent', self.stop)
-        if self.time_format == 'half':
-            self.register_intent_file('set.time.intent', self.handle_set_time)
-            self.register_entity_file('ampm.entity')
-        elif self.time_format == 'full':
-            self.register_intent_file('set.time.24hr.intent',
-                                      self.handle_set_time)
+        self.register_entity_file('ampm.entity')
         self.register_entity_file('time.entity')
         self.register_entity_file('length.entity')
         self.register_entity_file('daytype.entity')
@@ -264,6 +255,7 @@ class AlarmSkill(MycroftSkill):
         """
         self.cancel_scheduled_event(timer_name)
 
+    @intent_file_handler('set.time.intent')
     def handle_set_time(self, message):
         """ Callback for set time intent. parses the message bus message,
             and handles control flow for differnt cases
@@ -290,6 +282,7 @@ class AlarmSkill(MycroftSkill):
         else:
             self.speak_dialog('alarm.error')
 
+    @intent_file_handler('set.recurring.intent')
     def handle_set_recurring(self, message):
         """ Callback for set recurring time intent. """
         LOG.info(message.data)
@@ -306,6 +299,7 @@ class AlarmSkill(MycroftSkill):
             self.speak_dialog('alarm.error')
 
     # TODO: speak alarm in chronological order
+    @intent_file_handler('alarm.status.intent')
     def handle_status(self, message):
         """ Callback for status alarm intent """
         LOG.info(message.data)
@@ -368,6 +362,7 @@ class AlarmSkill(MycroftSkill):
         pass
 
     # TODO: converse for multiple alarms
+    @intent_file_handler('delete.intent')
     def handle_delete(self, message):
         """" Callback for delete alarm intent """
         LOG.info(message.data)
@@ -447,6 +442,11 @@ class AlarmSkill(MycroftSkill):
             return True
 
         return self.should_converse
+
+    @intent_file_handler('stop.intent')
+    def _stop(self, message):
+        """ Wrapper for stop method """
+        self.stop()
 
     # TODO: try this on mark 1
     def stop(self):
