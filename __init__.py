@@ -29,6 +29,7 @@ from adapt.intent import IntentBuilder
 from mycroft import intent_file_handler
 
 
+# TODO: use dialog instead of speak for localization
 class AlarmSkill(MycroftSkill):
 
     def __init__(self):
