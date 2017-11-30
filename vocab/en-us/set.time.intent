@@ -1,10 +1,10 @@
 wake me up in {length}.
 wake me up in {length} from now.
-(set|create|make) (an|a) alarm for {time} ({ampm}|) (this|) ({daytype}|)
-(set|create|make) an alarm (for|on|) {daytype} {time} ({ampm}|)
-(set|create|make) (a|an) {daytype} alarm for {time} ({ampm}|)
-(set|create|make) (a|an) {daytype} alarm at {time} ({ampm}|)
-(set|create|make) (a|an) {daytype} alarm on {time} ({ampm}|)
-(set|create|make) an alarm for {time} ({ampm}|)
-(set|create|make) an alarm for {time} ({ampm}|) {daytype}
-(set|create|make) an alarm for {time} ({ampm}|) this {daytype}
+set (an|a) alarm for {time} ({ampm}|) (this|) ({daytype}|)
+set an alarm (for|on|) {daytype} {time} ({ampm}|)
+set (a|an) {daytype} alarm for {time} ({ampm}|)
+set (a|an) {daytype} alarm at {time} ({ampm}|)
+set (a|an) {daytype} alarm on {time} ({ampm}|)
+set an alarm for {time} ({ampm}|)
+set an alarm for {time} ({ampm}|) {daytype}
+set an alarm for {time} ({ampm}|) this {daytype}

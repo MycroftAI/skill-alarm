@@ -17,6 +17,7 @@
 
 import time
 import arrow
+from pytz import timezone
 import dateutil.parser as dparser
 from datetime import datetime, timedelta
 from os.path import dirname, join, abspath
@@ -35,6 +36,7 @@ class AlarmSkill(MycroftSkill):
     def __init__(self):
         super(AlarmSkill, self).__init__()
         self.time_format = self.config_core.get('time_format')
+        self.time_zone = self.location['timezone']['code']
         self.should_converse = False
         self.stop_notify = False
         self.allow_notify = False
@@ -123,7 +125,7 @@ class AlarmSkill(MycroftSkill):
         elif 'weekday' in daytype.lower():
             days = _days[0:5]
         elif daytype == "":
-            days = [_days[arrow.now().replace(tzinfo='local').weekday()]]
+            days = [_days[arrow.now().to(self.time_zone).weekday()]]
         else:
             days = [_days[i] for i in range(len(_days)) if _days[i] in daytype]
 
@@ -150,6 +152,27 @@ class AlarmSkill(MycroftSkill):
         self.schedule_event(self.handle_end_timer, alarm_time,
                             data=alarm_name, name=alarm_name)
 
+    def _get_arrow(self, d):
+        """ Arrow object adjusted for timezones on devices
+
+            Args:
+                d (datetime): datetime object
+
+            returns:
+                arrow (arrow): arrow object corrected for device time settings
+        """
+        user_set_tz = \
+            timezone(self.time_zone).localize(datetime.now()).strftime('%Z')
+        device_tz = time.tzname
+        if user_set_tz in device_tz:
+            return arrow.get(d)
+        else:
+            seconds_to_shift = int(self.location['timezone']['offset']) / -1000
+            LOG.info(d)
+            LOG.info(datetime.now())
+            LOG.info(seconds_to_shift)
+            return arrow.get(d).shift(seconds=seconds_to_shift)
+
     def schedule_alarm(self, message_data):
         """ handles scheduling alarm, saving alarm, and
             speak utterance
@@ -166,7 +189,7 @@ class AlarmSkill(MycroftSkill):
             time = now + timedelta(
                 hours=hours, minutes=minutes, seconds=seconds)
             self._schedule_alarm_event(alarm_object["name"], time)
-            arrow_object = arrow.get(time).replace(tzinfo='local')
+            arrow_object = arrow.get(time)
             alarm_object['arrow_objects'].append(str(arrow_object))
         else:
             days_to_schedule = alarm_object["days"]
@@ -174,7 +197,7 @@ class AlarmSkill(MycroftSkill):
                 time, ampm = alarm_object['time'], alarm_object['ampm']
                 time_string = "{} {} {}".format(time, ampm, day)
                 d = dparser.parse(time_string, fuzzy=True)
-                arrow_object = arrow.get(d).replace(tzinfo='local')
+                arrow_object = self._get_arrow(d)
                 time = arrow_object.datetime
                 alarm_name = alarm_object["name"] + str(i)
                 self._schedule_alarm_event(alarm_name, time)

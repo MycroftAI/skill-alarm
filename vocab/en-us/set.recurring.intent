@@ -1,19 +1,6 @@
-wake me up (at {time} | for {time} | ) every {daytype} (at {time} | for {time} | ) (except on the {exceptdaytype} | ) (called {label} | ).
-wake me up (at {time} | for {time} | ) every {daytype} (at {time} | for {time} | ) (except for the {exceptdaytype} | ).
-wake me up (at {time} | for {time} | ) every {daytype} (at {time} | for {time} | ) (except on {exceptdaytype} | ).
-wake me up (at {time} | for {time} | ) every {daytype} (at {time} | for {time} | ) (except for {exceptdaytype} | ).
-
-wake me up (at {time} | for {time} | ) every {daytype} (at {time} | for {time} | ) (except {exceptdaytype} | ).
-
-(set | create | make) an alarm (clock | ) (at {time} | for {time} | ) every {daytype} (at {time} | for {time} | ) (except on the {exceptdaytype} | ) (called {label} | ).
-(set | create | make) an alarm (clock | ) (at {time} | for {time} | ) every {daytype} (at {time} | for {time} | ) (except for the {exceptdaytype} | ).
-(set | create | make) an alarm (clock | ) (at {time} | for {time} | ) every {daytype} (at {time} | for {time} | ) (except on {exceptdaytype} | ).
-(set | create | make) an alarm (clock | ) (at {time} | for {time} | ) every {daytype} (at {time} | for {time} | ) (except for {exceptdaytype} | ).
-
-(set | create | make) an alarm (clock | ) (at {time} | for {time} | ) every {daytype} (at {time} | for {time} | ) (except {exceptdaytype} | ).
-(set|create|make) (a|an|) (alarm|) (for|at|on|) {time} ({ampm}|)( alarm|)( for|) every {daytype}
-(set|create|make) (a|an|) (alarm|) (for|at|on|) {time}({ampm}|) (alarm|) (for|) every {daytype}
-(set|create|make) (a|an|) {time} ({ampm}|) (alarm|) (for|at|on|) every {daytype}
-(set|create|make) (a|an|) recurring {time} ({ampm}|) alarm (for|at|on|) {daytype}
-(set|create|make) (a|an|) recurring alarm (for|on|at|) {time}({ampm}| {ampm}|) {daytype}
-(set|create|make) (a|an|) alarm every {daytype} (at|for|on|) {time} ({ampm}|)
+(set|) (a|an|) (alarm|) (for|at|on|) {time} ({ampm}|)( alarm|)( for|) every {daytype}
+(set|) (a|an|) (alarm|) (for|at|on|) {time}({ampm}|) (alarm|) (for|) every {daytype}
+(set|) (a|an|) {time} ({ampm}|) (alarm|) (for|at|on|) every {daytype}
+(set|) (a|an|) recurring {time} ({ampm}|) alarm (for|at|on|) {daytype}
+(set|) (a|an|) recurring alarm (for|on|at|) {time}({ampm}| {ampm}|) {daytype}
+(set|) (a|an|) alarm every {daytype} (at|for|on|) {time} ({ampm}|)
