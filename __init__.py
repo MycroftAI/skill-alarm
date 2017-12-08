@@ -24,6 +24,7 @@ from os.path import dirname, join, abspath
 
 from mycroft import MycroftSkill
 from mycroft.util import play_mp3
+from mycroft.util import extract_datetime
 from mycroft.audio import wait_while_speaking
 from mycroft.util.log import LOG
 from adapt.intent import IntentBuilder
@@ -40,7 +41,7 @@ class AlarmSkill(MycroftSkill):
         self.should_converse = False
         self.stop_notify = False
         self.allow_notify = False
-        self.converse_context = {}
+        self.converse_context = {'context': None, 'data': None}
         self._days = ["monday", "tuesday", "wednesday", "thursday",
                       "friday", "saturday", "sunday"]
 
@@ -148,7 +149,7 @@ class AlarmSkill(MycroftSkill):
                 alarm_name (str): unique name i.e. 10:30 pm wednesday
                 alarm_time (datetime): datetime object of alarm time
         """
-        self.log("scheduling {} alarm".format(alarm_name))
+        LOG.info("scheduling {} alarm".format(alarm_name))
         self.schedule_event(self.handle_end_timer, alarm_time,
                             data=alarm_name, name=alarm_name)
 
@@ -200,7 +201,7 @@ class AlarmSkill(MycroftSkill):
                 self._schedule_alarm_event(alarm_name, time)
                 alarm_object['arrow_objects'].append(str(arrow_object))
 
-        self.log(alarm_object)
+        LOG.info(alarm_object)
         self.save_alarm(alarm_object)
         self.speak_alarm(alarm_object)
 
@@ -266,7 +267,7 @@ class AlarmSkill(MycroftSkill):
                     recurring = True
 
         if recurring is False:
-            self.remove_alarm(alarm_name)
+            self.remove_alarm(alarm_name[:-1])
 
     def cancel_timer(self, timer_name):
         """ cancel timer through event shceduler
@@ -281,7 +282,7 @@ class AlarmSkill(MycroftSkill):
         """ Callback for set time intent. parses the message bus message,
             and handles control flow for differnt cases
         """
-        self.log(message.data)
+        LOG.info(message.data)
         # error handling step to make sure recurring
         # request goes to right intent
         if 'every' in message.data['utterance'] or \
@@ -306,7 +307,7 @@ class AlarmSkill(MycroftSkill):
     @intent_file_handler('set.recurring.intent')
     def handle_set_recurring(self, message):
         """ Callback for set recurring time intent. """
-        self.log(message.data)
+        LOG.info(message.data)
         message.data['recurring'] = True
         if 'time' in message.data:
             if self.time_format == 'half':
@@ -323,10 +324,10 @@ class AlarmSkill(MycroftSkill):
     @intent_file_handler('alarm.status.intent')
     def handle_status(self, message):
         """ Callback for status alarm intent """
-        self.log(message.data)
+        LOG.info(message.data)
         alarm_object = self.parse_message_data(message.data)
         alarms = self.settings['alarms']
-        self.log(alarm_object)
+        LOG.info(alarm_object)
         # no alarms
         if len(alarms) == 0:
             self.speak_dialog('alarm.status')
@@ -353,7 +354,7 @@ class AlarmSkill(MycroftSkill):
                         .format(alarm['time'])
                     for day in alarm['days']:
                         speak_string += "one on {}. ".format(day)
-                    self.log(alarm)
+                    LOG.info(alarm)
                     nearest_arw, _ = self.get_nearest_date_from_now(
                         alarm['arrow_objects'])
                     day = self._days[nearest_arw.weekday()]
@@ -386,7 +387,7 @@ class AlarmSkill(MycroftSkill):
     @intent_file_handler('delete.intent')
     def handle_delete(self, message):
         """" Callback for delete alarm intent """
-        self.log(message.data)
+        LOG.info(message.data)
         alarm_object = self.parse_message_data(message.data)
         alarm_to_delete = alarm_object['name']
         alarms = self.settings['alarms']
@@ -469,7 +470,6 @@ class AlarmSkill(MycroftSkill):
         """ Wrapper for stop method """
         self.stop()
 
-    # TODO: try this on mark 1
     def stop(self):
         if self.allow_notify is True:
             self.stop_notify = True
