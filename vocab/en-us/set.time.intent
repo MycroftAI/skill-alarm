@@ -1,5 +1,7 @@
 wake me up in {length}.
 wake me up in {length} from now.
+set an alarm for {length} from now.
+set the alarm for {length} from now.
 set (an|a) alarm for {time} ({ampm}|) (this|) ({daytype}|)
 set an alarm (for|on|) {daytype} {time} ({ampm}|)
 set (a|an) {daytype} alarm for {time} ({ampm}|)
