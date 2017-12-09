@@ -122,6 +122,15 @@ class AlarmSkill(MycroftSkill):
             days = _days[5:7]
         elif 'weekday' in daytype.lower():
             days = _days[0:5]
+        elif 'tomorrow' in daytype.lower():
+            day_index = arrow.now().to(self.time_zone).weekday()
+            if day_index == 7:
+                day_index = 0
+            else:
+                day_index += 1
+            days = [_days[day_index]]
+        elif 'today' in daytype.lower():
+            days = [_days[arrow.now().to(self.time_zone).weekday()]]
         elif daytype == "":
             days = [_days[arrow.now().to(self.time_zone).weekday()]]
         else:
