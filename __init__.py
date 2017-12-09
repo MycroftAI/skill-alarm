@@ -191,8 +191,11 @@ class AlarmSkill(MycroftSkill):
             for i, day in enumerate(days_to_schedule):
                 time, ampm = alarm_object['time'], alarm_object['ampm']
                 time_string = "{} {} {}".format(time, ampm, day)
-                d = dparser.parse(time_string, fuzzy=True)
+                d = extract_datetime(
+                    time_string,
+                    arrow.now().to(self.time_zone).datetime)[0]
                 arrow_object = self._get_arrow(d)
+                LOG.info(arrow_object)
                 time = arrow_object.datetime
                 alarm_name = alarm_object["name"] + str(i)
                 self._schedule_alarm_event(alarm_name, time)
