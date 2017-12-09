@@ -1,0 +1,6 @@
+wake me up (at {time}| for {time}| ) every {daytype} (at {time}| for {time}| ) (called {label} | ).
+(set | create | make) an alarm (clock | ) (at {time}| for {time}| ) every {daytype} (at {time}| for {time}| )  (called {label} | ).
+(set | create | make) an alarm (clock | ) (at {time}| for {time}| )   on (the|)  {daytype}.
+(set | create | make) an alarm (clock | ) (at {time}| for {time}| )  ({daytype}|) 
+wake me up in {length}.
+wake me up in {length} from now.
