@@ -192,7 +192,7 @@ class AlarmSkill(MycroftSkill):
             seconds, minutes, hours = d.second, d.minute, d.hour
             time = now + timedelta(
                 hours=hours, minutes=minutes, seconds=seconds)
-            self._schedule_alarm_event(alarm_object["name"], time)
+            self._schedule_alarm_event(alarm_object["name"]+str(0), time)
             arrow_object = arrow.get(time)
             alarm_object['arrow_objects'].append(str(arrow_object))
         else:
