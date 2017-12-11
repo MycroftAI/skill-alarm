@@ -198,6 +198,11 @@ class AlarmSkill(MycroftSkill):
         else:
             days_to_schedule = alarm_object["days"]
             for i, day in enumerate(days_to_schedule):
+
+                arw_tz_adjust = arrow.now().to(self.time_zone)
+                if day == self._days[arw_tz_adjust.weekday()]:
+                    day = ""
+
                 time, ampm = alarm_object['time'], alarm_object['ampm']
                 time_string = "{} {} {}".format(time, ampm, day)
                 d = extract_datetime(
