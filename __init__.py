@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 from os.path import dirname, join, abspath
 
 from mycroft import MycroftSkill
-from mycroft.util import play_mp3
+from mycroft.util import play_wav
 from mycroft.util import extract_datetime
 from mycroft.audio import wait_while_speaking
 from mycroft.util.log import LOG
@@ -422,7 +422,7 @@ class AlarmSkill(MycroftSkill):
             self.speak(
                 "I can not find an alarm set for {}".format(alarm_to_delete))
 
-    def notify(self, repeat=6):
+    def notify(self, repeat=42):
         """ recursively calls it's self to play alarm mp3
 
             Args:
@@ -432,8 +432,8 @@ class AlarmSkill(MycroftSkill):
             self.cancel_scheduled_event(self.notify_event_name)
 
         self.allow_notify = True
-        path = join(abspath(dirname(__file__)), 'timerBeep.mp3')
-        self.notify_process = play_mp3(path)
+        path = join(abspath(dirname(__file__)), 'timerBeep.wav')
+        self.notify_process = play_wav(path)
         if self.stop_notify is False:
             if repeat > 0:
                 arw_time = arrow.now().replace(tzinfo='local')
