@@ -1,0 +1,6 @@
+wake mich (at {time}| for {time}| ) jeden {daytype} (at {time}| for {time}| ) (called {label} | ).
+(set | create | make) an alarm (clock | ) (at {time}| for {time}| ) jeden {daytype} (at {time}| for {time}| )  (called {label} | ).
+(set | create | make) an alarm (clock | ) (at {time}| for {time}| )   am (the|)  {daytype}.
+(set | create | make) an alarm (clock | ) (at {time}| for {time}| )  ({daytype}|) 
+wake mich auf in {length}.
+wake mich auch in {length} von jetzt.
