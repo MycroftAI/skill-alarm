@@ -1,0 +1,16 @@
+Status der Alarme
+Welche Alarme habe ich?
+Habe ich irgendwelche Alarme?
+Habe ich irgendwelche Alarme eingestellt?
+Wann ist mein nächster Alarm?
+Status des Alarms
+Status des {time} ({ampm}|) Alarms
+Status des {time} ({ampm}|) {daytype} Alarms
+status meines {time} ({ampm}|) alarm
+status meines {time} ({ampm}|) {daytype} alarm
+Wie viel Zeit bleibt noch übrig? bis {time} ({ampm}|)
+Wie viel Zeit bleibt noch übrig? bis {time} ({ampm}|) {daytype}
+Zeit übrig auf meinen {time} ({ampm}|) alarm
+Zeit übrig auf meinem {time} ({ampm}|) {daytype} alarm
+Zeit übrig auf meinem {length} alarm
+Wie viel Zeit bleibt noch übrig? {length} alarm
