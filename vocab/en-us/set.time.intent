@@ -1,15 +1,18 @@
 wake me up in {length}.
 wake me up in {length} from now.
-set an alarm for {length} from now.
-set the alarm for {length} from now.
-set alarm for {length} from now.
-set (an|a) alarm for {time} ({ampm}|) (this|) ({daytype}|)
-set an alarm (for|on|) {daytype} {time} ({ampm}|)
-set (a|an) {daytype} alarm for {time} ({ampm}|)
-set (a|an) {daytype} alarm at {time} ({ampm}|)
-set (a|an) {daytype} alarm on {time} ({ampm}|)
-set an alarm for {time} ({ampm}|)
-set an alarm for {time} ({ampm}|) {daytype}
-set an alarm for {time} ({ampm}|) this {daytype}
-set (a|an|) {time} alarm
-set (a|an|) {time} {ampm} alarm
+(set|start) (an|the) alarm for {length} from now.
+(set|start) (an|the) alarm {length} from now.
+(set|start) alarm for {length} from now.
+(set|start) (an|a) alarm for {time} ({ampm}|) (this|) ({daytype}|)
+(set|start) an alarm (for|on|) {daytype} {time} ({ampm}|)
+(set|start) (a|an) {daytype} alarm for {time} ({ampm}|)
+(set|start) (a|an) {daytype} alarm at {time} ({ampm}|)
+(set|start) (a|an) {daytype} alarm on {time} ({ampm}|)
+(set|start) an alarm for {time} {ampm}
+(set|start) an alarm for {time} {ampm} {daytype}
+(set|start) an alarm for {time} {ampm} this {daytype}
+(set|start) an alarm for {time} 
+(set|start) an alarm for {time} {daytype}
+(set|start) an alarm for {time} this {daytype}
+(set|start) (a|an|) {time} alarm
+(set|start) (a|an|) {time} {ampm} alarm
