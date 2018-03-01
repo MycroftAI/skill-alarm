@@ -1,6 +1,5 @@
-(set|) (a|an|) (alarm|) (for|at|on|) {time} ({ampm}|)( alarm|)( for|) every {daytype}
-(set|) (a|an|) (alarm|) (for|at|on|) {time}({ampm}|) (alarm|) (for|) every {daytype}
-(set|) (a|an|) {time} ({ampm}|) (alarm|) (for|at|on|) every {daytype}
-(set|) (a|an|) recurring {time} ({ampm}|) alarm (for|at|on|) {daytype}
-(set|) (a|an|) recurring alarm (for|on|at|) {time}({ampm}| {ampm}|) {daytype}
-(set|) (a|an|) alarm every {daytype} (at|for|on|) {time} ({ampm}|)
+(set|start) (a|an) alarm for {time} ({ampm}|) every {daytype}
+(set|start) (a|an) {time} ({ampm}|) alarm for every {daytype}
+(set|start) (a|an) recurring {time} ({ampm}|) alarm for {daytype}
+(set|start) (a|an) recurring alarm (for|on|at|) {time}({ampm}| {ampm}|) {daytype}
+(set|start) (a|an) alarm every {daytype} for {time} ({ampm}|)
