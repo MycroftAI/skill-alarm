@@ -63,6 +63,21 @@ class AlarmSkill(MycroftSkill):
         """Plays alarm sound file"""
         play_wav(self.sound_file)
 
+    def _notify_non_repeat(self, alarm_object):
+        # remove alarms that just went off
+        self.settings['alarms'] = [
+            i for i in self.settings['alarms']
+            if i['name'] != alarm_object['name']
+        ]
+        self._play_beep()
+
+    def _store_alarm(self, alarm_object):
+        if self.settings.get('alarms'):
+            self.settings['alarms'].append(alarm_object)
+        else:
+            self.settings['alarms'] = []
+            self.settings['alarms'].append(alarm_object)
+
     def _parse_and_append(self, utterance, append):
         utt_list = utterance.split()
         new_list = []
@@ -82,6 +97,15 @@ class AlarmSkill(MycroftSkill):
         )[0]
         LOG.info(date)
         return self._adjusted_date(date).datetime
+
+    def _schedule_event(self, handler, date, alarm_object):
+        self._store_alarm(alarm_object)
+        self.schedule_event(
+            handler,
+            date,
+            alarm_object,
+            alarm_object['name']
+        )
 
     @intent_file_handler('set.time.intent')
     def handle_set_alarm(self, message):
@@ -103,7 +127,7 @@ class AlarmSkill(MycroftSkill):
             if message.data.get('ampm'):
                 date = self._extract_datetime(utterance)
                 LOG.info(date)
-                # self.schedule_event(self._play_beep, date)
+                self.schedule_event(self._play_beep, date)
             else:
                 response = self.get_response('need.ampm')
                 am_set = set(self.translate_list('am'))
@@ -112,11 +136,11 @@ class AlarmSkill(MycroftSkill):
                 if am_set & response_set:
                     date = self._extract_datetime(utterance, ' am')
                     LOG.info(date)
-                    # self.schedule_event(self._play_beep, date)
+                    self.schedule_event(self._play_beep, date)
                 elif pm_set & response_set:
                     date = self._extract_datetime(utterance, ' pm')
                     LOG.info(date)
-                    # self.schedule_event(self._play_beep, date)
+                    self.schedule_event(self._play_beep, date)
         else:
             self.speak_dialog('no.time.found')
 
@@ -136,6 +160,17 @@ class AlarmSkill(MycroftSkill):
             for word in utterance.split():
                 if fuzzy_match(word, synonym) > threshold:
                     return daily_frequency
+
+    def _schedule_repeating_event(
+            self, handler, date, frequency, alarm_object):
+        self._store_alarm(alarm_object)
+        self.schedule_repeating_event(
+            handler,
+            date,
+            frequency,
+            alarm_object,
+            alarm_object['name']
+        )
 
     @intent_file_handler('set.recurring.intent')
     def handle_set_recurring(self, message):
