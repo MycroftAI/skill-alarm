@@ -156,11 +156,13 @@ class AlarmSkill(MycroftSkill):
                     frequency = self._determine_frequency(utterance)
                     LOG.info(date)
                     LOG.info(frequency)
+                    # self.schedule_repeating_event(self._play_beep, date, frequency)
                 elif pm_set & response_set:
                     date = self._extract_datetime(utterance, ' pm')
                     frequency = self._determine_frequency(utterance)
                     LOG.info(date)
                     LOG.info(frequency)
+                    # self.schedule_repeating_event(self._play_beep, date, frequency)
         else:
             self.speak_dialog('no.time.found')
 
