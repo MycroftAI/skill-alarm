@@ -462,14 +462,15 @@ class AlarmSkill(MycroftSkill):
 
     def converse(self, utterances, lang='en-us'):
         if self.converse_context['context'] == 'need.ampm':
-            utt = utterances[0]
+            utt = utterances[0].lower()
             prev_message_data = self.converse_context.get('data')
-            if 'pm' in utt.lower() or 'p.m' in utt.lower() or \
-               'evening' in utt.lower():
+            if 'pm' in utt or 'p.m' in utt or 'evening' in utt:
                 prev_message_data["ampm"] = 'p.m.'
-            elif 'am' in utt.lower() or 'a.m' in utt.lower() or \
-                 'morning' in utt.lower():
+            elif 'am' in utt or 'a.m' in utt or 'morning' in utt:
                 prev_message_data["ampm"] = 'a.m.'
+            elif 'cancel' in utt or 'stop' in utt:
+                self.reset_converse()
+                return True
             else:
                 self.speak_dialog('alarm.ampm', expect_response=True)
                 return self.should_converse
