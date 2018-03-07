@@ -43,6 +43,9 @@ class AlarmSkill(MycroftSkill):
         self.register_entity_file('length.entity')
         self.register_entity_file('daytype.entity')
 
+        self.settings['alarms'] = []
+        self.settings['repeat_alarms'] = []
+
     def _adjusted_date(self, dt):
         """Adjust datetime according to users timezone
 
@@ -81,7 +84,6 @@ class AlarmSkill(MycroftSkill):
             self.settings['alarms'].append(date)
 
     def __schedule_event(self, date):
-        self._store_alarm(str(date))
         self.schedule_event(
             self._notify_non_repeat,
             date,
@@ -109,12 +111,20 @@ class AlarmSkill(MycroftSkill):
         LOG.info(date)
         return self._adjusted_date(date).datetime
 
+    def get_speak_string(self, time, *args):
+        speak = time.replace(" ", "") + " "
+        for i in args:
+            speak += i
+            speak += " "
+        return speak.strip()
+
     @intent_file_handler('set.time.intent')
     def handle_set_alarm(self, message):
         LOG.info(message.data)
         utterance = message.data.get('utterance')
         length = message.data.get('length')
         time = message.data.get('time')
+        daytype = message.data.get('daytype') or ""
         now = datetime.now()
         LOG.info(now)
         if length:
@@ -125,14 +135,19 @@ class AlarmSkill(MycroftSkill):
             )
             LOG.info(time)
             self.__schedule_event(time)
+            speak = length
+            self.speak_dialog('alarm.scheduled', data=dict(time=speak))
+            self._store_alarm((str(date), speak))
         elif time:
             if message.data.get('ampm'):
                 date = self._extract_datetime(utterance)
                 LOG.info(date)
                 self.__schedule_event(date)
-                speak = time + message.data.get('ampm')
+                speak = self.get_speak_string(
+                    time, message.data.get('ampm'), daytype)
                 self.speak_dialog(
                     'alarm.scheduled', data=dict(time=speak))
+                self._store_alarm((str(date), speak))
             else:
                 response = self.get_response('need.ampm')
                 if response:
@@ -143,16 +158,15 @@ class AlarmSkill(MycroftSkill):
                         date = self._extract_datetime(utterance, ' am')
                         LOG.info(date)
                         self.__schedule_event(date)
-                        speak = time + 'am'
-                        self.speak_dialog(
-                            'alarm.scheduled', data=dict(time=speak))
+                        speak = self.get_speak_string(time, 'am', daytype)
                     elif pm_set & response_set:
                         date = self._extract_datetime(utterance, ' pm')
                         LOG.info(date)
                         self.__schedule_event(date)
-                        speak = time + 'pm'
-                        self.speak_dialog(
-                            'alarm.scheduled', data=dict(time=speak))
+                        speak = self.get_speak_string(time, 'pm', daytype)
+                self.speak_dialog(
+                    'alarm.scheduled', data=dict(time=speak))
+                self._store_alarm((str(date), speak))
         else:
             self.speak_dialog('no.time.found')
 
@@ -205,16 +219,14 @@ class AlarmSkill(MycroftSkill):
         LOG.info(message.data)
         utterance = message.data.get('utterance')
         time = message.data.get('time')
+        daytype = message.data.get('daytype') or ""
         if time:
             if message.data.get('ampm'):
                 date = self._extract_datetime(utterance)
                 frequency = self._get_frequency(utterance)
                 self._schedule_repeating_event(date, frequency)
                 LOG.info(date)
-                daytype = message.data.get('daytype') or ""
-                speak = time + ' pm ' + daytype
-                self.speak_dialog(
-                    'alarm.scheduled.repeating', data=dict(time=speak))
+                speak = self.get_speak_string(time, 'pm', daytype)
             else:
                 response = self.get_response('need.ampm')
                 if response:
@@ -227,26 +239,22 @@ class AlarmSkill(MycroftSkill):
                         LOG.info(date)
                         LOG.info(frequency)
                         self._schedule_repeating_event(date, frequency)
-                        daytype = message.data.get('daytype') or ""
-                        speak = time + ' pm ' + daytype
-                        self.speak_dialog(
-                            'alarm.scheduled.repeating', data=dict(time=speak))
+                        speak = self.get_speak_string(time, 'pm', daytype)
                     elif pm_set & response_set:
                         date = self._extract_datetime(utterance, ' pm')
                         frequency = self._get_frequency(utterance)
                         LOG.info(date)
                         LOG.info(frequency)
                         self._schedule_repeating_event(date, frequency)
-                        daytype = message.data.get('daytype') or ""
-                        speak = time + ' pm ' + daytype
-                        self.speak_dialog(
-                            'alarm.scheduled.repeating', data=dict(time=speak))
+                        speak = self.get_speak_string(time, 'pm', daytype)
+            self.speak_dialog(
+                'alarm.scheduled.repeating', data=dict(time=speak))
+            self._store_alarm_repeat((str(date), speak))
         else:
             self.speak_dialog('no.time.found')
 
     @intent_file_handler('alarm.status.intent')
     def handle_status(self, message):
-        LOG.info('sttufff')
         pass
 
     @intent_file_handler('delete.intent')
