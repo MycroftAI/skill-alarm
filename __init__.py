@@ -14,6 +14,7 @@
 
 import time
 import arrow
+import json
 from os.path import join, abspath, dirname
 from datetime import datetime, timedelta
 from pytz import timezone
@@ -61,11 +62,16 @@ class AlarmSkill(MycroftSkill):
         if user_set_tz in device_tz:
             return arrow.get(dt)
         else:
+            # TODO: Fix - Offset does not account for CDT, only CST
             seconds_to_shift = int(self.location['timezone']['offset']) / -1000
+            # account for daylight savings
+            if 'D' in user_set_tz:
+                seconds_to_shift += -3600
             return arrow.get(dt).shift(seconds=seconds_to_shift)
 
     def _play_beep(self):
         """Plays alarm sound file"""
+        LOG.info("beep beep beep")
         play_wav(self.sound_file)
 
     def _notify_non_repeat(self, message):
@@ -83,12 +89,12 @@ class AlarmSkill(MycroftSkill):
             self.settings['alarms'] = []
             self.settings['alarms'].append(date)
 
-    def __schedule_event(self, date):
+    def __schedule_event(self, date, name):
         self.schedule_event(
             self._notify_non_repeat,
             date,
-            str(date),
-            str(date)
+            data=str(date),
+            name=name
         )
 
     def _parse_and_append(self, utterance, append):
@@ -111,7 +117,7 @@ class AlarmSkill(MycroftSkill):
         LOG.info(date)
         return self._adjusted_date(date).datetime
 
-    def get_speak_string(self, time, *args):
+    def get_alarm_name(self, time, *args):
         speak = time.replace(" ", "") + " "
         for i in args:
             speak += i
@@ -134,17 +140,17 @@ class AlarmSkill(MycroftSkill):
                 hours=hours, minutes=minutes, seconds=seconds
             )
             LOG.info(time)
-            self.__schedule_event(time)
             speak = length
+            self.__schedule_event(time, speak)
             self.speak_dialog('alarm.scheduled', data=dict(time=speak))
             self._store_alarm((str(date), speak))
         elif time:
             if message.data.get('ampm'):
                 date = self._extract_datetime(utterance)
                 LOG.info(date)
-                self.__schedule_event(date)
-                speak = self.get_speak_string(
+                speak = self.get_alarm_name(
                     time, message.data.get('ampm'), daytype)
+                self.__schedule_event(date, speak)
                 self.speak_dialog(
                     'alarm.scheduled', data=dict(time=speak))
                 self._store_alarm((str(date), speak))
@@ -157,13 +163,13 @@ class AlarmSkill(MycroftSkill):
                     if am_set & response_set:
                         date = self._extract_datetime(utterance, ' am')
                         LOG.info(date)
-                        self.__schedule_event(date)
-                        speak = self.get_speak_string(time, 'am', daytype)
+                        speak = self.get_alarm_name(time, 'am', daytype)
+                        self.__schedule_event(date, speak)
                     elif pm_set & response_set:
                         date = self._extract_datetime(utterance, ' pm')
                         LOG.info(date)
-                        self.__schedule_event(date)
-                        speak = self.get_speak_string(time, 'pm', daytype)
+                        speak = self.get_alarm_name(time, 'pm', daytype)
+                        self.__schedule_event(date, speak)
                 self.speak_dialog(
                     'alarm.scheduled', data=dict(time=speak))
                 self._store_alarm((str(date), speak))
@@ -204,14 +210,13 @@ class AlarmSkill(MycroftSkill):
             self.settings['repeat_alarms'] = []
             self.settings['repeat_alarms'].append(date)
 
-    def _schedule_repeating_event(self, date, frequency):
-        self._store_alarm_repeat(str(date))
+    def _schedule_repeating_event(self, date, frequency, name):
         self.schedule_repeating_event(
             self._notify_repeat,
             date,
             frequency,
             data=(str(date), frequency),
-            name=str(date)
+            name=name + 'repeat'
         )
 
     @intent_file_handler('set.recurring.intent')
@@ -224,9 +229,9 @@ class AlarmSkill(MycroftSkill):
             if message.data.get('ampm'):
                 date = self._extract_datetime(utterance)
                 frequency = self._get_frequency(utterance)
-                self._schedule_repeating_event(date, frequency)
+                speak = self.get_alarm_name(time, 'pm', daytype)
+                self._schedule_repeating_event(date, frequency, speak)
                 LOG.info(date)
-                speak = self.get_speak_string(time, 'pm', daytype)
             else:
                 response = self.get_response('need.ampm')
                 if response:
@@ -238,15 +243,15 @@ class AlarmSkill(MycroftSkill):
                         frequency = self._get_frequency(utterance)
                         LOG.info(date)
                         LOG.info(frequency)
-                        self._schedule_repeating_event(date, frequency)
-                        speak = self.get_speak_string(time, 'pm', daytype)
+                        speak = self.get_alarm_name(time, 'pm', daytype)
+                        self._schedule_repeating_event(date, frequency, speak)
                     elif pm_set & response_set:
                         date = self._extract_datetime(utterance, ' pm')
                         frequency = self._get_frequency(utterance)
                         LOG.info(date)
                         LOG.info(frequency)
-                        self._schedule_repeating_event(date, frequency)
-                        speak = self.get_speak_string(time, 'pm', daytype)
+                        speak = self.get_alarm_name(time, 'pm', daytype)
+                        self._schedule_repeating_event(date, frequency, speak)
             self.speak_dialog(
                 'alarm.scheduled.repeating', data=dict(time=speak))
             self._store_alarm_repeat((str(date), speak))
@@ -255,11 +260,123 @@ class AlarmSkill(MycroftSkill):
 
     @intent_file_handler('alarm.status.intent')
     def handle_status(self, message):
-        pass
+        alarms = [i[1] for i in self.settings.get('alarms', [])]
+        repeating_alarms = [
+            i[1] for i in self.settings.get('repeat_alarms', [])
+        ]
+
+        amt_total = len(alarms) + len(repeating_alarms)
+        self.speak_dialog(
+            "alarms.list.amt",
+            data={'amount': amt_total}
+        )
+
+        if len(alarms) > 0:
+            speak_string = ""
+            for idx, alarm in enumerate(alarms):
+                speak_string += alarm + \
+                    "." if idx + 1 == len(alarms) else alarm + ", "
+            self.speak_dialog("alarms.list", data={'alarms': speak_string})
+
+        if len(repeating_alarms) > 0:
+            speak_string = ""
+            for idx, repeat_alarms in enumerate(repeating_alarms):
+                speak_string += repeat_alarms + \
+                    "." if idx + 1 == len(repeating_alarms) \
+                    else repeat_alarms + ", "
+            self.speak_dialog(
+                "alarms.list.repeat",
+                data={'alarms': speak_string}
+            )
+
+    def delete_alarm(self, name):
+        LOG.info(name)
+        self.cancel_scheduled_event(name)
+        self.settings['alarms'] = [
+            i for i in self.settings['alarms']
+            if i[1] != name
+        ]
+
+    def delete_repeat(self, name):
+        self.cancel_scheduled_event(name)
+        self.settings['repeat_alarms'] = [
+            i for i in self.settings['alarms']
+            if i[1] != name.replace("repeat", "")
+        ]
 
     @intent_file_handler('delete.intent')
     def handle_delete(self, message):
-        pass
+        LOG.info(message.data)
+        time = message.data.get('time') or ""
+        ampm = message.data.get('ampm') or ""
+        daytype = message.data.get('daytype') or ""
+
+        name = self.get_alarm_name(time, ampm, daytype)
+        LOG.info(name)
+
+        best_match = (None, float("-1"))
+        for alarm in self.settings.get('alarms'):
+            prob = fuzzy_match(name, alarm[1])
+            if prob > 0.5 and prob > best_match[1]:
+                best_match = (alarm[1], prob)
+
+        best_match_repeat = (None, float("-1"))
+        for alarm in self.settings.get('repeat_alarms'):
+            prob = fuzzy_match(name, alarm[1])
+            if prob > 0.5 and prob > best_match[1]:
+                best_match_repeat = (alarm[1], prob)
+
+        def _delete_one_time(name):
+            self.delete_alarm(name)
+            self.speak_dialog('delete.alarm', data={'name': name})
+
+        def _delete_repeat(name):
+            # all repeat alarms has 'repeat'
+            # appended to name in the event scheduler
+            self.delete_repeat(name+'repeat')
+            self.speak_dialog('delete.alarm', data={'name': name})
+
+        # if similar by 10% then ask for one to delete
+        if 0.0 <= abs(best_match[1] - best_match_repeat[1]) <= 0.1 \
+                and best_match[0] and best_match_repeat[0]:
+
+            self.speak_dialog('delete.multimatch')
+            self.speak_dialog('delete.match', data={'alarms': best_match[0]})
+            self.speak_dialog('delete.match.repeat',
+                              data={'alarms': best_match_repeat[0]})
+            response = self.get_response('delete.multimatch.response')
+            one_time = self.translate_list('one.time')
+            recurring = self.translate_list('recurring')
+            best_option = (None, float('-inf'), None)
+
+            for option in one_time:
+                prob = fuzzy_match(option, response)
+                if prob > 0.5 and prob > best_option[1]:
+                    best_option = (option, prob, "one time")
+
+            for option in recurring:
+                prob = fuzzy_match(option, response)
+                if prob > 0.5 and prob > best_option[1]:
+                    best_option = (option, prob, "recurring")
+
+            if best_option[2] == "recurring":
+                name = best_match_repeat[0]
+                _delete_repeat(name)
+            elif best_option[2] == "one time":
+                name = best_match[0]
+                _delete_one_time(name)
+            else:
+                self.speak_dialog('delete.no.options')
+        elif best_match[1] > best_match_repeat[1] and best_match[0]:
+            # delete best match
+            name = best_match[0]
+            _delete_one_time(name)
+        elif best_match_repeat[1] > best_match[1] and best_match_repeat[0]:
+            # delete best match repeat
+            name = best_match_repeat[0]
+            _delete_repeat(name)
+        else:
+            self.speak_dialog('delete.no.match')
 
     @intent_file_handler('stop.intent')
     def handle_stop(self, message):

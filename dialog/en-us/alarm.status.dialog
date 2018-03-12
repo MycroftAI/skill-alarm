@@ -1,3 +1,1 @@
-You do not have any active alarms
-I do not see any active alarms
-It seems like you have no active alarms
+You have {{amount}} active {{plural}}. {{string}}
