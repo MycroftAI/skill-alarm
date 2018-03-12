@@ -37,15 +37,14 @@ class AlarmSkill(MycroftSkill):
         self.sound_file = join(abspath(dirname(__file__)), 'timerBeep.wav')
         self.beep_process = None
         self._should_play_beep = True
+        self.settings['alarms'] = []
+        self.settings['repeat_alarms'] = []
 
     def initialize(self):
         self.register_entity_file('ampm.entity')
         self.register_entity_file('time.entity')
         self.register_entity_file('length.entity')
         self.register_entity_file('daytype.entity')
-
-        self.settings['alarms'] = []
-        self.settings['repeat_alarms'] = []
 
     def _adjusted_date(self, dt):
         """Adjust datetime according to users timezone
