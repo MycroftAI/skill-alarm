@@ -1,9 +1,7 @@
 {
   "utterance": "set an alarm for 6 am every weekday",
   "expected_data": {
-      "ampm": "am",
       "time": "6",
       "daytype": "weekday"
-  },
-  "expected_response": "Okay. Setting a recurring 6 a.m. weekday alarm"
+  }
 }
