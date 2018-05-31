@@ -1,7 +1,7 @@
 {
   "utterance": "set an alarm for 6 pm",
   "expected_data": {
-    "time": 6
+    "time": "6"
   }
 }
 
