@@ -1,6 +1,6 @@
-wake mich (at {time}| for {time}| ) jeden {daytype} (at {time}| for {time}| ) (called {label} | ).
-(set | create | make) an alarm (clock | ) (at {time}| for {time}| ) jeden {daytype} (at {time}| for {time}| )  (called {label} | ).
-(set | create | make) an alarm (clock | ) (at {time}| for {time}| )   am (the|)  {daytype}.
-(set | create | make) an alarm (clock | ) (at {time}| for {time}| )  ({daytype}|) 
+wake mich jeden {daytype} (um {time}| für {time}| ) (um {time}| für {time}| ) (nenne den Wecker {label} | ).
+(setze | erstelle | mache) einen alarm (um {time}| für {time}| ) (Uhr | ) jeden {daytype} (um {time}| für {time}| )  (gennant {label} | ).
+(setze | erstelle | mache) einen alarm (um {time}| für {time}| ) (Uhr | )  am (|)  {daytype}.
+(setze | erstelle | mache) einen alarm (um {time}| für {time}| ) (Uhr | ) ({daytype}|) 
 wake mich auf in {length}.
-wake mich auch in {length} von jetzt.
+wake mich auf in {length} ab jetzt.
