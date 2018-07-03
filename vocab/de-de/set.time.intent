@@ -1,15 +1,15 @@
 wecke mich auf in {length}.
-wecke mich auf in {length} von jetzt.
+wecke mich auf in {length} ab jetzt.
 stelle einen Alarm ein auf {length} von jetzt.
 Stellen Sie den Alarm für ein {length} von jetzt.
 Alarm instellen für {length} von jetzt.
-setze (an|a) alarm für {time} ({ampm}|) (this|) ({daytype}|)
-setze ein Alarm (for|on|) {daytype} {time} ({ampm}|)
-setze (a|an) {daytype} alarm für {time} ({ampm}|)
-setze (a|an) {daytype} alarm um {time} ({ampm}|)
-setze (a|an) {daytype} alarm um {time} ({ampm}|)
+setze (ein|einen) alarm für {time} ({ampm}|) (diesen|) ({daytype}|)
+setze ein Alarm (für|an|) {daytype} {time} ({ampm}|)
+setze (ein|einen) {daytype} alarm für {time} ({ampm}|)
+setze (ein|einen) {daytype} alarm um {time} ({ampm}|)
+setze (ein|einen) {daytype} alarm um {time} ({ampm}|)
 setze ein alarm für {time} ({ampm}|)
 setze ein alarm für {time} ({ampm}|) {daytype}
 setze ein alarm für {time} ({ampm}|) diesen {daytype}
-setze (a|an|) {time} alarm
-setze (a|an|) {time} {ampm} alarm
+setze (ein|einen|) {time} alarm
+setze (ein|einen|) {time} {ampm} alarm
