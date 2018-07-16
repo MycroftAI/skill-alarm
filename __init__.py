@@ -221,6 +221,7 @@ class AlarmSkill(MycroftSkill):
                         self.__schedule_event(date, speak)
                 else:
                     self.speak_dialog('no.time.found')
+                    return
                 self.speak_dialog(
                     'alarm.scheduled', data=dict(time=speak))
                 self._store_alarm((str(date), speak))
