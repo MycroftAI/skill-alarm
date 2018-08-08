@@ -17,461 +17,622 @@ import arrow
 from os.path import join, abspath, dirname
 from datetime import datetime, timedelta
 from pytz import timezone
+import os.path
+from alsaaudio import Mixer
 
-from mycroft import MycroftSkill
-from mycroft.util import extract_datetime, extractnumber, play_wav
-from mycroft.util.parse import fuzzy_match
+from mycroft import MycroftSkill, intent_handler
+from mycroft.util import play_wav, play_mp3
+from mycroft.util.parse import fuzzy_match, extract_datetime, extract_number
+from mycroft.util.format import nice_date_time, nice_time
 from mycroft.audio import wait_while_speaking
 from adapt.intent import IntentBuilder
 from mycroft import intent_file_handler
 from mycroft.util.log import LOG
 from dateutil.parser import parse
+from dateutil.rrule import rrulestr
+from mycroft.util.time import (
+    to_utc, default_timezone, to_local, now_local, now_utc)
 
 
-# TODO: use dialog instead of speak for localization
+# WORKING:
+# Set an alarm
+#    for 9
+#    no for 9 am
+# Set an alarm for tomorrow evening at 8:20
+# Set an alarm for monday morning at 8
+# create an alarm for monday morning at 8
+# snooze
+# stop
+# turn off the alarm
+# create a repeating alarm for tuesdays at 7 am
+# Set a recurring alarm
+# Set a recurring alarm for weekdays at 7
+# snooze for 15 minutes
+# set an alarm for 20 seconds from now
+#
+# TODO:
+# Set a recurring alarm for mondays and wednesdays at 7
+
 class AlarmSkill(MycroftSkill):
 
     def __init__(self):
         super(AlarmSkill, self).__init__()
-        self.time_zone = self.location['timezone']['code']
-        self.sound_file = join(abspath(dirname(__file__)), 'timerBeep.wav')
         self.beep_process = None
         self._should_play_beep = True
-        self.settings['alarms'] = []
+        self.settings['alarms'] = []    # OLD, [(str(datetime),name), ...]
         self.settings['repeat_alarms'] = []
 
+        # Seconds of gap between sound repeats.
+        # The value name must match an option from the 'sound' value of the
+        # settingmeta.json, which also corresponds to the name of an mp3
+        # file in the skill's sounds/ folder.  E.g. <skill>/sounds/bell.mp3
+        #
+        self.sound_interval = {
+            "bell": 9.07,
+            "escalate": 40.0,
+            "constant_beep": 10.0,
+            "beep4": 7.0
+        }
+        # default sound is 'constant_beep'
+        self.settings['sound'] = 'constant_beep'
+        self.settings['start_quiet'] = False
+        try:
+            self.mixer = Mixer()
+        except Exception:
+            # Retry instanciating the mixer
+            try:
+                self.mixer = Mixer()
+            except Exception as e:
+                self.log.error('Couldn\'t allocate mixer, {}'.format(repr(e)))
+                self.mixer = None
+        self.restore_volume = None
+
+        # Alarm list format [(timestamp, repeat_rule[, timestamp2]), ...]
+        # where:
+        #  timestamp is a POSIX timestamp float assumed to
+        #       be in the utc timezone.
+        #
+        #  repeat_rule is for generating the next in a series.  Valid
+        #       repeat_rules include None for a one-shot alarm or any other
+        #       iCalendar rule from RFC <https://tools.ietf.org/html/rfc5545>.
+        #
+        #  timestamp2 is optional, for a recently passed alarm at boot or a
+        #       snoozed alarm
+        # NOTE: Using list instead of tuple because of serialization
+        self.settings["alarm"] = []
+
+    def dump_alarms(self, tag=""):
+        # Useful when debugging
+        self.log.info("********** ALARMS "+tag+"*************")
+        self.log.info(self.settings["alarm"])
+        idx = 1
+        for alarm in self.settings["alarm"]:
+            timestamp_time = alarm[0]
+            dt = datetime.fromtimestamp(timestamp_time)
+            self.log.info(str(idx) + " - " + str(alarm) +
+                          "  U" + str(dt) + " L" + str(to_local(dt)))
+            idx += 1
+
+        now_ts = now_utc().timestamp()
+        dt = datetime.fromtimestamp(now_ts)
+        self.log.info("-"*40)
+        self.log.info("NOW: " + str(now_ts) +
+                      "  U" + str(to_utc(dt)) + " L" + str(to_local(dt)))
+
+        self.log.info("*"*60)
+
     def initialize(self):
-        self.register_entity_file('ampm.entity')
-        self.register_entity_file('time.entity')
-        self.register_entity_file('length.entity')
-        self.register_entity_file('daytype.entity')
+        self.register_entity_file('daytype.entity')  # TODO: Keep?
+        self.recurrence_dict = self.translate_namedvalues('recurring')
 
-    def _adjusted_date(self, dt):
-        """Adjust datetime according to users timezone
+        # TODO: convert old alarms:
+        # for alarm in self.settings.get('alarms', []):
+        #    t = alarm[0]
+        # for alarm in self.settings.get('repeat_alarms', []):
+        #    t = alarm[0]
 
-        Arguments:
-            dt (datetime) -- datetime object
+        # Time is the first value, so this will sort alarms by time
+        self.settings["alarm"].sort()
 
-        Returns:
-            arrow -- arrow object
-        """
-        user_set_tz = \
-            timezone(self.time_zone).localize(datetime.now()).strftime('%Z')
-        device_tz = time.tzname
-        if user_set_tz in device_tz:
-            return arrow.get(dt)
+        # This will reschedule alarms which have expired within the last
+        # 5 minutes, and cull anything older.
+        self._curate_alarms(5*60)
+
+        self._schedule()
+
+    def set_alarm(self, when, repeat=None):
+        if repeat:
+            self.settings["alarm"].append(
+                    self._create_recurring_alarm(when, repeat))
         else:
-            # TODO: Fix - Offset does not account for CDT, only CST
-            seconds_to_shift = int(self.location['timezone']['offset']) / -1000
-            # account for daylight savings
-            if 'D' in user_set_tz:
-                seconds_to_shift += -3600
-            return arrow.get(dt).shift(seconds=seconds_to_shift)
+            self.settings["alarm"].append([to_utc(when).timestamp(), ""])
+        self._schedule()
 
-    def _play_beep(self):
-        """Plays alarm sound file"""
-        # LOG.info("beep beep beep")
-        if self._should_play_beep:
-            time = datetime.now() + timedelta(seconds=6)
-            self.schedule_event(self._play_beep, time)
-            self.beep_process = play_wav(self.sound_file)
-        else:
-            self._should_play_beep = True
+    def _schedule(self):
+        # cancel any existing timed event
+        self.cancel_scheduled_event('NextAlarm')
+        self._curate_alarms()
 
-    def _notify_non_repeat(self, message):
-        """callback for the non repeat scheduled event
+        # set timed event for next alarm (if it exists)
+        if self.settings["alarm"]:
+            timestamp_time = self.settings["alarm"][0][0]
+            dt = datetime.fromtimestamp(timestamp_time)
+            self.schedule_event(self._alarm_expired,
+                                to_utc(dt),
+                                name='NextAlarm')
 
-        Arguments:
-            message (Message): Message Object
+    def _curate_alarms(self, curation_limit=1):
+        """[summary]
+            curation_limit (int, optional): Seconds past expired at which to
+                                            remove the alarm
         """
-        # remove alarms that just went off
-        self.settings['alarms'] = [
-            i for i in self.settings['alarms']
-            if i != message.data
-        ]
-        self._play_beep()
-
-    def _store_alarm(self, date):
-        """saves alarm to object
-
-        Arguments:
-            date (tuple): datetime, alarm name
-        """
-        if self.settings.get('alarms'):
-            self.settings['alarms'].append(date)
-        else:
-            self.settings['alarms'] = []
-            self.settings['alarms'].append(date)
-
-    def __schedule_event(self, date, name):
-        """wrapper to schedule one time events
-
-        Arguments:
-            date (datetime): datetime object
-            name (str): alarm
-        """
-        self.schedule_event(
-            self._notify_non_repeat,
-            date,
-            data=str(date),
-            name=name
-        )
-
-    def _parse_and_append(self, utterance, append):
-        """helper to return a formatted string for extract_datetime
-
-        Arguments:
-            utterance (str): initial utterance
-            append (str): word to add into string
-
-        Returns:
-            (str): extract_datetime formatted string
-        """
-        utt_list = utterance.split()
-        new_list = []
-        for i in utt_list:
-            if extractnumber(i):
-                i += append
-            if ":" in i:
-                i += append
-            new_list.append(i)
-        return " ".join(new_list)
-
-    def _extract_datetime(self, utterance, append=""):
-        """"Wrapper to extract_datetime. Enhance utterance and
-            adjust returned datetime according to user set timezone
-
-        Arguments:
-            utterance (str): utterance from message.data
-
-        Keyword Arguments:
-            append (str): string to enhance utterance
-
-        Returns:
-            (datetime): datetime that's been adjusted for user stimezone
-        """
-        # LOG.info(self._parse_and_append(utterance, append))
-        date = extract_datetime(
-            self._parse_and_append(utterance, append),
-            arrow.now().to(self.time_zone).datetime
-        )[0]
-        # LOG.info(date)
-        return self._adjusted_date(date).datetime
-
-    def get_alarm_name(self, time, *args):
-        """create a name for the alarm
-
-        Arguments:
-            time (str): time entity from Message object
-
-        Returns:
-            (str)
-        """
-        speak = time.replace(" ", "") + " "
-        for i in args:
-            speak += i
-            speak += " "
-        return speak.strip()
-
-    @intent_file_handler('set.time.intent')
-    def handle_set_alarm(self, message):
-        # LOG.info(message.data)
-        utterance = message.data.get('utterance')
-        length = message.data.get('length')
-        time = message.data.get('time')
-        daytype = message.data.get('daytype') or ""
-        now = datetime.now()
-        # LOG.info(now)
-        if length:
-            date = extract_datetime(utterance)[0]
-            seconds, minutes, hours = date.second, date.minute, date.hour
-            time = now + timedelta(
-                hours=hours, minutes=minutes, seconds=seconds
-            )
-            # LOG.info(time)
-            speak = length
-            self.__schedule_event(time, speak)
-            self.speak_dialog('alarm.scheduled', data=dict(time=speak))
-            self._store_alarm((str(date), speak))
-        elif time:
-            if message.data.get('ampm'):
-                date = self._extract_datetime(utterance)
-                # LOG.info(date)
-                speak = self.get_alarm_name(
-                    time, message.data.get('ampm'), daytype)
-                self.__schedule_event(date, speak)
-                self.speak_dialog(
-                    'alarm.scheduled', data=dict(time=speak))
-                self._store_alarm((str(date), speak))
-            else:
-                response = self.get_response('need.ampm')
-                if response:
-                    am_set = set(self.translate_list('am'))
-                    pm_set = set(self.translate_list('pm'))
-                    response_set = set([r.lower() for r in response.split()])
-                    if am_set & response_set:
-                        date = self._extract_datetime(utterance, ' am')
-                        # LOG.info(date)
-                        speak = self.get_alarm_name(time, 'am', daytype)
-                        self.__schedule_event(date, speak)
-                    elif pm_set & response_set:
-                        date = self._extract_datetime(utterance, ' pm')
-                        # LOG.info(date)
-                        speak = self.get_alarm_name(time, 'pm', daytype)
-                        self.__schedule_event(date, speak)
+        alarms = []
+        now_ts = now_utc().timestamp()
+        for alarm in self.settings["alarm"]:
+            if alarm[0] < now_ts:
+                if alarm[0] < (now_ts - curation_limit):
+                    # skip playing an old alarm (but resched if needed)
+                    if alarm[1]:
+                        alarms.append(self._next_repeat(alarm))
                 else:
-                    self.speak_dialog('no.time.found')
-                    return
-                self.speak_dialog(
-                    'alarm.scheduled', data=dict(time=speak))
-                self._store_alarm((str(date), speak))
-        else:
-            self.speak_dialog('no.time.found')
-
-    def _get_frequency(self, utterance):
-        """determine weekly or daily freqeuncy
-
-        Arguments:
-            utterance (str): utterance for Message object
-
-        Returns:
-            (int): 604800 for weekly or 86400 for daily
-        """
-        threshold = 0.85
-        weekly_frequency = 604800
-        daily_frequency = 86400
-
-        days_list = self.translate_list('days')
-        for day in days_list:
-            for word in utterance.split():
-                if fuzzy_match(word, day) > threshold:
-                    return weekly_frequency
-
-        daily_list = self.translate_list('everyday')
-        for synonym in daily_list:
-            for word in utterance.split():
-                if fuzzy_match(word, synonym) > threshold:
-                    return daily_frequency
-
-    def _notify_repeat(self, message):
-        """callback for repeat schedule events. Delete past time
-            and stores new time in the settings
-
-        Arguments:
-            message (Message)
-        """
-        data = message.data
-        new_date = parse(data[0]) + timedelta(seconds=data[1])
-        self.settings['repeat_alarms'] = [
-            i for i in self.settings['alarms']
-            if i != data[0]
-        ]
-        self.settings['repeat_alarms'].append((str(new_date), data[2]))
-        self._play_beep()
-
-    def _store_alarm_repeat(self, date):
-        """save repeating alarm objects
-
-        Arguments:
-            date (tuple): datettime, alarm name
-        """
-        if self.settings.get('repeat_alarms'):
-            self.settings['repeat_alarms'].append(date)
-        else:
-            self.settings['repeat_alarms'] = []
-            self.settings['repeat_alarms'].append(date)
-
-    def _schedule_repeating_event(self, date, frequency, name):
-        """"Wrapper to schedule repeating events
-
-        Arguments:
-            date (datetime)
-            frequency (int): time in seconds between calls
-            name (str): name of alarm
-        """
-        self.schedule_repeating_event(
-            self._notify_repeat,
-            date,
-            frequency,
-            data=(str(date), frequency, name),
-            name=name + 'repeat'
-        )
-
-    @intent_file_handler('set.recurring.intent')
-    def handle_set_recurring(self, message):
-        # LOG.info(message.data)
-        utterance = message.data.get('utterance')
-        time = message.data.get('time')
-        daytype = message.data.get('daytype') or ""
-        if time:
-            if message.data.get('ampm'):
-                date = self._extract_datetime(utterance)
-                frequency = self._get_frequency(utterance)
-                speak = self.get_alarm_name(time, 'pm', daytype)
-                self._schedule_repeating_event(date, frequency, speak)
-                # LOG.info(date)
+                    # schedule for right now, with the
+                    # third entry as the original base time
+                    base = alarm[2] if len(alarm) == 3 else alarm[0]
+                    alarms.append([now_ts+1, alarm[1], base])
             else:
-                response = self.get_response('need.ampm')
-                if response:
-                    am_set = set(self.translate_list('am'))
-                    pm_set = set(self.translate_list('pm'))
-                    response_set = set([r.lower() for r in response.split()])
-                    if am_set & response_set:
-                        date = self._extract_datetime(utterance, ' am')
-                        frequency = self._get_frequency(utterance)
-                        # LOG.info(date)
-                        # LOG.info(frequency)
-                        speak = self.get_alarm_name(time, 'pm', daytype)
-                        self._schedule_repeating_event(date, frequency, speak)
-                    elif pm_set & response_set:
-                        date = self._extract_datetime(utterance, ' pm')
-                        frequency = self._get_frequency(utterance)
-                        # LOG.info(date)
-                        # LOG.info(frequency)
-                        speak = self.get_alarm_name(time, 'pm', daytype)
-                        self._schedule_repeating_event(date, frequency, speak)
-            self.speak_dialog(
-                'alarm.scheduled.repeating', data=dict(time=speak))
-            self._store_alarm_repeat((str(date), speak))
+                alarms.append(alarm)
+
+        alarms.sort()
+        self.settings["alarm"] = alarms
+
+    def _next_repeat(self, alarm):
+        # evaluate recurrence to the next instance
+        r = rrulestr("RRULE:" + alarm[1])
+        if len(alarm) == 3:
+            ref = datetime.fromtimestamp(alarm[2])
         else:
-            self.speak_dialog('no.time.found')
+            ref = datetime.fromtimestamp(alarm[0])
+
+        local_ref_notz = to_local(ref).replace(tzinfo=None)
+        dt_next_local = r.after(local_ref_notz)
+
+        return [to_utc(dt_next_local).timestamp(), alarm[1]]
+
+    def _create_recurring_alarm(self, when, repeat):
+        # 'repeat' is one of the values in the self.recurrence_dict
+        # convert rule into an iCal rrule
+        # TODO: Support more complex alarms, e.g. first monday, monthly, etc
+        reps = self.recurrence_dict[repeat].split()
+        rule = ""
+        abbr = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"]
+        days = []
+        for day in reps:
+            days.append(abbr[int(day)])
+        if days:
+            rule = "FREQ=WEEKLY;INTERVAL=1;BYDAY=" + ",".join(days)
+
+        return [to_utc(when).timestamp(), rule]
+
+    def has_expired_alarm(self):
+        # True is an alarm should be 'going off' now.  Snoozed alarms don't
+        # count until the are triggered again.
+        if not self.settings["alarm"]:
+            return False
+
+        now_ts = now_utc().timestamp()
+        for alarm in self.settings["alarm"]:
+            if alarm[0] <= now_ts:
+                return True
+
+        return False
+
+    # Wake me on ... (hard to match with Adapt entities)
+    @intent_handler(IntentBuilder("").require("WakeMe").
+                    optionally("Recurring").optionally("Recurrence"))
+    def handle_wake_me(self, message):
+        self.handle_set_alarm(message)
+
+    # Set an alarm for ...
+    @intent_handler(IntentBuilder("").require("Set").require("Alarm").
+                    optionally("Recurring").optionally("Recurrence"))
+    def handle_set_alarm(self, message):
+        utt = message.data.get('utterance').lower()
+        recurrence = None
+
+        if message.data.get('Recurring'):
+            recurrence = message.data.get('Recurrence')
+            if not recurrence:
+                # a bug in Adapt is missing the recurrence.voc.  Look ourselves
+                for r in self.recurrence_dict:
+                    if r in utt:
+                        recurrence = r
+
+            while recurrence not in self.recurrence_dict:
+                r = self.get_response('query.recurrence', num_retries=1)
+                if not r:
+                    return
+                recurrence = r
+
+        # Get the time
+        when = extract_datetime(utt)
+        now = extract_datetime("now")
+        while not when or when[0] == now[0]:
+            # No time given, ask for one
+            r = self.get_response('query.for.when', num_retries=1)
+            if not r:
+                return
+            when = extract_datetime(r)
+
+        # Verify time
+        alarm_time = when[0]
+        while not when or when[0] == now[0]:
+            if recurrence:
+                t = nice_time(alarm_time, use_ampm=True)
+                conf = self.ask_yesno('confirm.recurring.alarm',
+                                      data={'time': t,
+                                            'recurrence': recurrence})
+            else:
+                t = nice_date_time(alarm_time, now=now[0], use_ampm=True)
+                conf = self.ask_yesno('confirm.alarm', data={'time': t})
+            if not conf:
+                return
+            if conf == 'yes':
+                when = [alarm_time]
+            else:
+                # check if a new (corrected) time was given
+                when = extract_datetime(conf)
+                if not when or when[0] == now[0]:
+                    # Not a confirmation and no date/time in statement, quit
+                    return
+                alarm_time = when[0]
+                when = None  # reverify
+
+        if not recurrence:
+            self.set_alarm(alarm_time)
+        else:
+            self.set_alarm(alarm_time, repeat=recurrence)
+
+        # Don't want to hide the animation
+        self.enclosure.deactivate_mouth_events()
+        self.speak_dialog("alarm.scheduled")
+        self._show_alarm_anim(alarm_time)
+        self.enclosure.activate_mouth_events()
+
+    @property
+    def use_24hour(self):
+        return self.config_core.get('time_format') == 'full'
+
+    def _show_alarm_anim(self, dt):
+        # Animated confirmation of the alarm
+        self.enclosure.mouth_reset()
+
+        # Show the time in numbers "8:00 AM"
+        timestr = nice_time(dt, speech=False, use_ampm=True,
+                            use_24hour=self.use_24hour)
+        x = 16 - ((len(timestr)*4) // 2)  # centers on display
+        if not self.use_24hour:
+            x += 1  # account for wider letters P and M, offset by the colon
+
+        # draw on the display
+        for ch in timestr:
+            # deal with some odd characters that can break filesystems
+            if ch == ":":
+                png = "colon.png"
+                w = 2
+            elif ch == " ":
+                png = "blank.png"
+                w = 2
+            elif ch == 'A' or ch == 'P' or ch == 'M':
+                png = ch+".png"
+                w = 5
+            else:
+                png = ch+".png"
+                w = 4
+
+            png = join(abspath(dirname(__file__)), "anim", png)
+            self.enclosure.mouth_display_png(png, x=x, y=2, refresh=False)
+            x += w
+        time.sleep(2)
+        self.enclosure.mouth_reset()
+
+        # Show an animation
+        # TODO: mouth_display_png() is choking images > 8x8
+        #       (likely on the enclosure side)
+        for i in range(1, 16):
+            png = join(abspath(dirname(__file__)),
+                       "anim",
+                       "Alarm-"+str(int(i))+"-1.png")
+            # self.enclosure.mouth_display_png(png, x=0, y=0, refresh=False,
+            #                                  invert=True)
+            png = join(abspath(dirname(__file__)),
+                       "anim",
+                       "Alarm-"+str(int(i))+"-2.png")
+            if i < 8:
+                self.enclosure.mouth_display_png(png, x=8, y=0, refresh=False,
+                                                 invert=True)
+            png = join(abspath(dirname(__file__)),
+                       "anim",
+                       "Alarm-"+str(int(i))+"-3.png")
+            self.enclosure.mouth_display_png(png, x=16, y=0, refresh=False,
+                                             invert=True)
+            png = join(abspath(dirname(__file__)),
+                       "anim",
+                       "Alarm-"+str(int(i))+"-4.png")
+            self.enclosure.mouth_display_png(png, x=24, y=0, refresh=False,
+                                             invert=True)
+
+            if i == 4:
+                time.sleep(1)
+            else:
+                time.sleep(0.15)
+        self.enclosure.mouth_reset()
+
+    def _describe(self, alarm):
+        if alarm[1]:
+            # Describe repeating alarms
+            if alarm[1].startswith("FREQ=WEEKLY;INTERVAL=1;BYDAY="):
+                days = alarm[1][29:]  # e.g. "SU,WE"
+                days = (days.replace("SU", "0").replace("MO", "1").
+                        replace("TU", "2").replace("WE", "3").
+                        replace("TH", "4").replace("FR", "5").
+                        replace("SA", "6").replace(",", " "))  # now "0 3"
+
+                desc = None
+                for r in self.recurrence_dict:
+                    if self.recurrence_dict[r] == days:
+                        desc = r
+                        break    # accept the first match
+
+                # Assemble a long desc, e.g. "Monday and wednesday"
+                if not desc:
+                    day_names = []
+                    for day in days.split(" "):
+                        for r in self.recurrence_dict:
+                            if self.recurrence_dict[r] is day:
+                                day_names.append(r)
+                                break
+
+                    # TODO: Make translatable. mycroft.util.format.join("and")?
+                    desc = ", ".join(day_names[:-1]) + " and " + day_names[-1]
+            else:
+                desc = "repeats"
+
+            dt = datetime.fromtimestamp(alarm[0], default_timezone())
+            return self.translate('recurring.alarm',
+                                  data={'time': nice_time(dt, use_ampm=True),
+                                        'recurrence': desc})
+        else:
+            dt = datetime.fromtimestamp(alarm[0], default_timezone())
+            return nice_date_time(dt, now=now_local(), use_ampm=True)
 
     @intent_file_handler('alarm.status.intent')
     def handle_status(self, message):
-        alarms = [i[1] for i in self.settings.get('alarms', [])]
-        repeating_alarms = [
-            i[1] for i in self.settings.get('repeat_alarms', [])
-        ]
+        total = len(self.settings["alarm"])
+        if not total:
+            self.speak_dialog("alarms.list.empty")
+            return
 
-        amt_total = len(alarms) + len(repeating_alarms)
-        self.speak_dialog(
-            "alarms.list.amt",
-            data={'amount': amt_total}
-        )
+        desc = []
+        for alarm in self.settings["alarm"]:
+            desc.append(self._describe(alarm))
+            if len(desc) > 3:
+                break
 
-        if len(alarms) > 0:
-            speak_string = ""
-            for idx, alarm in enumerate(alarms):
-                speak_string += alarm + \
-                    "." if idx + 1 == len(alarms) else alarm + ", "
-            self.speak_dialog("alarms.list", data={'alarms': speak_string})
+        if total == 1:
+            self.speak_dialog("alarms.list.single", data={'item': desc[0]})
+        else:
+            self.speak_dialog("alarms.list.multi",
+                              data={'count': total,
+                                    'item': ", ".join(desc[:-1]),
+                                    'itemAnd': desc[-1]})
 
-        if len(repeating_alarms) > 0:
-            speak_string = ""
-            for idx, repeat_alarms in enumerate(repeating_alarms):
-                speak_string += repeat_alarms + \
-                    "." if idx + 1 == len(repeating_alarms) \
-                    else repeat_alarms + ", "
-            self.speak_dialog(
-                "alarms.list.repeat",
-                data={'alarms': speak_string}
-            )
+    @intent_file_handler('delete.all.intent')
+    def handle_delete_all(self, message):
+        total = len(self.settings["alarm"])
+        if not total:
+            self.speak_dialog("alarms.list.empty")
+            return
 
-    def delete_alarm(self, name):
-        """deletes one time alarms and cancel scheduled
-            and remove alarm from settings
-
-        Arguments:
-            name (str): name used to schedule alarm
-        """
-        # LOG.info(name)
-        self.cancel_scheduled_event(name)
-        self.settings['alarms'] = [
-            i for i in self.settings['alarms']
-            if i[1] != name
-        ]
-
-    def delete_repeat(self, name):
-        """"deletes repeating alarms and cancel scheduled
-            and remove alarm from settings
-
-        Arguments:
-            name (str): name used to schedule alarm
-        """
-        self.cancel_scheduled_event(name)
-        self.settings['repeat_alarms'] = [
-            i for i in self.settings['alarms']
-            if i[1] != name.replace("repeat", "")
-        ]
+        # Confirm cancel alarms...
+        prompt = ('ask.cancel.alarm' if total == 1
+                  else 'ask.cancel.alarm.plural')
+        if self.ask_yesno(prompt, data={"count": total}) == 'yes':
+            self.settings["alarm"] = []
+            self._schedule()
+            self.speak_dialog('alarms.cancelled')
 
     @intent_file_handler('delete.intent')
     def handle_delete(self, message):
-        # LOG.info(message.data)
+        total = len(self.settings["alarm"])
+        if not total:
+            self.speak_dialog("alarms.list.empty")
+            return
+
+        utt = message.data.get('utterance') or ""
         time = message.data.get('time') or ""
-        ampm = message.data.get('ampm') or ""
-        daytype = message.data.get('daytype') or ""
 
-        name = self.get_alarm_name(time, ampm, daytype)
-        # LOG.info(name)
+        # First see if the user spoke a date/time in the delete request
+        when = extract_datetime(utt)
+        now = extract_datetime("now")
+        if when and when[0] != now[0]:
+            # Look for a match...
+            search = when[0]
+            for alarm in self.settings["alarm"]:
+                # TODO: Handle repeating desc
+                dt = datetime.fromtimestamp(alarm[0], default_timezone())
+                delta = search - dt
+                delta2 = dt - search
+                if (abs(delta.total_seconds()) < 60 or
+                        abs(delta2.total_seconds()) < 60):
+                    # Really close match, just delete it
+                    desc = self._describe(alarm)
+                    self.settings["alarm"].remove(alarm)
+                    self._schedule()
+                    self.speak_dialog("alarm.cancelled.desc",
+                                      data={'desc': desc})
+                    return
 
-        best_match = (None, float("-1"))
-        for alarm in self.settings.get('alarms'):
-            prob = fuzzy_match(name, alarm[1])
-            if prob > 0.5 and prob > best_match[1]:
-                best_match = (alarm[1], prob)
+                if (abs(delta.total_seconds()) < 60*60*2 or
+                        abs(delta2.total_seconds()) < 60*60*2):
+                    # Not super close, get confirmation
+                    desc = self._describe(alarm)
+                    if self.ask_yesno('ask.cancel.desc.alarm',
+                                      data={'desc': desc}) == 'yes':
+                        self.settings["alarm"].remove(alarm)
+                        self._schedule()
+                        self.speak_dialog("alarm.cancelled")
+                        return
 
-        best_match_repeat = (None, float("-1"))
-        for alarm in self.settings.get('repeat_alarms'):
-            prob = fuzzy_match(name, alarm[1])
-            if prob > 0.5 and prob > best_match_repeat[1]:
-                best_match_repeat = (alarm[1], prob)
-
-        def _delete_one_time(name):
-            self.delete_alarm(name)
-            self.speak_dialog('delete.alarm', data={'name': name})
-
-        def _delete_repeat(name):
-            # all repeat alarms has 'repeat'
-            # appended to name in the event scheduler
-            self.delete_repeat(name+'repeat')
-            self.speak_dialog('delete.alarm.recurring', data={'name': name})
-
-        diff = abs(best_match[1] - best_match_repeat[1])
-        # if similar by 10% then ask for one to delete
-        if 0.0 <= diff <= 0.1 and best_match[0] and best_match_repeat[0]:
-            self.speak_dialog('delete.multimatch')
-            self.speak_dialog('delete.match', data={'alarms': best_match[0]})
-            self.speak_dialog('delete.match.repeat',
-                              data={'alarms': best_match_repeat[0]})
-            response = self.get_response('delete.multimatch.response')
-            one_time = self.translate_list('one.time')
-            recurring = self.translate_list('recurring')
-            best_option = (None, float('-inf'), None)
-
-            for option in one_time:
-                prob = fuzzy_match(option, response)
-                if prob > 0.5 and prob > best_option[1]:
-                    best_option = (option, prob, "one time")
-
-            for option in recurring:
-                prob = fuzzy_match(option, response)
-                if prob > 0.5 and prob > best_option[1]:
-                    best_option = (option, prob, "recurring")
-
-            if best_option[2] == "recurring":
-                name = best_match_repeat[0]
-                _delete_repeat(name)
-            elif best_option[2] == "one time":
-                name = best_match[0]
-                _delete_one_time(name)
-            else:
-                self.speak_dialog('delete.no.options')
-        elif best_match[1] > best_match_repeat[1] and best_match[0]:
-            # delete best match
-            name = best_match[0]
-            _delete_one_time(name)
-        elif best_match_repeat[1] > best_match[1] and best_match_repeat[0]:
-            # delete best match repeat
-            name = best_match_repeat[0]
-            _delete_repeat(name)
+        if total == 1:
+            desc = self._describe(self.settings["alarm"][0])
+            if self.ask_yesno('ask.cancel.desc.alarm',
+                              data={'desc': desc}) == 'yes':
+                self.settings["alarm"] = []
+                self._schedule()
+                self.speak_dialog("alarm.cancelled")
+                return
         else:
-            self.speak_dialog('delete.no.match')
+            # list the alarms
+            self.handle_status(message)
+            resp = self.get_response('ask.which.alarm.delete')
+            if not resp:
+                return
 
-    def stop(self):
+            when = extract_datetime(resp)
+            if when and when[0] != now[0]:
+                # Attempting to delete by spoken data
+                search = when[0]
+                for alarm in self.settings["alarm"]:
+                    # TODO: Handle repeating desc
+                    dt = datetime.fromtimestamp(alarm[0], default_timezone())
+                    delta = search - dt
+                    delta2 = dt - search
+                    if (abs(delta.total_seconds()) < 60 or
+                            abs(delta2.total_seconds()) < 60):
+                        # Really close match, just delete it
+                        desc = self._describe(alarm)
+                        self.settings["alarm"].remove(alarm)
+                        self._schedule()
+                        self.speak_dialog("alarm.cancelled.desc",
+                                          data={'desc': desc})
+                        return
+
+                    if (abs(delta.total_seconds()) < 60*60*2 or
+                            abs(delta2.total_seconds()) < 60*60*2):
+                        # Not super close, get confirmation
+                        desc = self._describe(alarm)
+                        if self.ask_yesno('ask.cancel.desc.alarm',
+                                          data={'desc': desc}) == 'yes':
+                            self.settings["alarm"].remove(alarm)
+                            self._schedule()
+                            self.speak_dialog("alarm.cancelled")
+                            return
+
+            # Attempt to delete by spoken index
+            idx = extract_number(resp, ordinals=True)
+            if idx and idx > 0 and idx <= total:
+                idx = int(idx)
+                desc = self._describe(self.settings["alarm"][idx-1])
+                del self.settings["alarm"][idx-1]
+                self._schedule()
+                self.speak_dialog("alarm.cancelled", data={'desc': desc})
+                return
+
+            # Failed to delete
+            self.speak_dialog("alarm.not.found")
+
+    def _alarm_expired(self):
+        # Find user-selected alarm sound
+        alarm_file = join(abspath(dirname(__file__)),
+                          'sounds', self.settings["sound"] + ".mp3")
+        if os.path.isfile(alarm_file):
+            self.sound_file = alarm_file
+            self.sound_repeat = self.sound_interval[self.settings["sound"]]
+        else:
+            self.sound_file = join(abspath(dirname(__file__)),
+                                   'sounds', "constant_beep.mp3")
+            self.sound_repeat = self.sound_interval["constant_beep"]
+
+        if self.settings['start_quiet'] and self.mixer:
+            if not self.restore_volume:  # don't if already lowered and saved!
+                self.restore_volume = self.mixer.getvolume()
+                self.volume = 0    # increase by 10% each pass
+        else:
+            self.restore_volume = None
+
+        self._play_beep()
+
+    def _stop_expired_alarm(self):
+        if self.has_expired_alarm():
+            if self.beep_process:
+                self.beep_process.kill()
+                self.beep_process = None
+            self.cancel_scheduled_event('Beep')
+
+            if self.restore_volume:
+                self.mixer.setvolume(self.restore_volume[0])
+                self.restore_volume = None
+
+            self.cancel_scheduled_event('NextAlarm')
+            self._curate_alarms(0)
+            self._schedule()
+            return True
+        else:
+            return False
+
+    @intent_file_handler('snooze.intent')
+    def snooze_alarm(self, message):
+        if not self.has_expired_alarm():
+            return
+
+        self.cancel_scheduled_event('Beep')
         if self.beep_process:
             self.beep_process.kill()
             self.beep_process = None
-            self._should_play_beep = False
+
+        utt = message.data.get('utterance') or ""
+        snooze_for = extract_number(utt)
+        if not snooze_for or snooze_for < 1:
+            snooze_for = 9  # default to 9 minutes
+
+        # Snooze always applies the the first alarm in the sorted array
+        alarm = self.settings["alarm"][0]
+        dt = datetime.fromtimestamp(alarm[0])
+        snooze = to_utc(dt) + timedelta(minutes=snooze_for)
+
+        if len(alarm) < 3:
+            original_time = alarm[0]
+        else:
+            original_time = alarm[2]  # already snoozed
+
+        # Fill schedule with a snoozed entry -- 3 items:
+        #    snooze_expire_timestamp, repeat_rule, original_timestamp
+        self.settings["alarm"][0] = [snooze.timestamp(),
+                                     alarm[1],
+                                     original_time]
+        self._schedule()
+
+    def _play_beep(self):
+        """ Play alarm sound file """
+        next_beep = now_utc() + timedelta(seconds=(self.sound_repeat))
+        self.schedule_event(self._play_beep, next_beep, name='Beep')
+        if self.beep_process:
+            self.beep_process.kill()
+
+        # Increase volume each pass until fully on
+        if self.restore_volume:
+            if self.volume < 90:
+                self.volume += 10
+            self.mixer.setvolume(self.volume)
+
+        self.beep_process = play_mp3(self.sound_file)
+
+    @intent_file_handler('stop.intent')
+    def handle_alternative_stop(self, message):
+        self.stop()
+
+    def stop(self):
+        return self._stop_expired_alarm()
 
 
 def create_skill():

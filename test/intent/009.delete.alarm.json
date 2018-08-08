@@ -1,0 +1,5 @@
+{
+    "utterance": "cancel all alarms",
+    "intent_type": "handle_delete_all",
+    "expected_dialog": "alarms.list.empty"
+}

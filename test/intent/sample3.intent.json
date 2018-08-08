@@ -1,7 +1,0 @@
-{
-  "utterance": "set an alarm for 6 am every weekday",
-  "expected_data": {
-      "time": "6",
-      "daytype": "weekday"
-  }
-}
