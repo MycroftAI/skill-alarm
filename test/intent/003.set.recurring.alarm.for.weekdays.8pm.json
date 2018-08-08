@@ -1,0 +1,9 @@
+{
+    "utterance": "set an alarm",
+    "intent_type": "handle_set_alarm",
+    "expected_dialog": "query.recurrence",
+    "responses": ["weekdays","8 pm","yes"],
+    "expected_dialog": "query.for.when",
+    "expected_dialog": "confirm.alarm",
+    "expected_dialog": "alarm.scheduled"
+}

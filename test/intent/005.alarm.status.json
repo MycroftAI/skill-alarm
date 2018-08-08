@@ -1,0 +1,5 @@
+{
+    "utterance": "are there any alarms",
+    "intent_type": "alarm.status.intent",
+    "expected_dialog": "alarms.list.multi"
+}

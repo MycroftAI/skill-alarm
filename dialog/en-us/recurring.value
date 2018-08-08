@@ -1,0 +1,19 @@
+# translated name, day(s) of week
+monday,1
+mondays,1
+tuesday,2
+tuesdays,2
+wednesday,3
+wednesdays,3
+thursday,4
+thursdays,4
+friday,5
+fridays,5
+saturday,6
+saturdays,6
+sunday,0
+sundays,0
+weekdays,1 2 3 4 5
+weekends,0 6
+every day,0 1 2 3 4 5 6
+everyday,0 1 2 3 4 5 6

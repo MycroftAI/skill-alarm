@@ -1,0 +1,29 @@
+{
+    "name": "Alarm",
+    "skillMetadata": {
+        "sections": [
+            {
+                "name": "Alarm Sound",
+                "fields": [
+                    {
+                        "type": "label",
+                        "label": "Choose the sound to play when your alarms go off.  <P/>Previews:<p/><ul><h4>Beep-Beep-Beep-Beep</h4><audio controls><source src='https://raw.githubusercontent.com/MycroftAI/skill-alarm/master/sounds/beep4.mp3' type='audio/mpeg'></audio><h4>Constant Beeping</h4><audio controls><source src='horse.mp3' type='audio/mpeg'></audio><h4></h4><audio controls><source src='horse.mp3' type='audio/mpeg'></audio><h4>Bell</h4><audio controls><source src='horse.mp3' type='audio/mpeg'></audio></ul>"
+                    },
+                    {
+                        "name": "sound",
+                        "type": "select",
+                        "label": "Selection:",
+                        "options": "Constant Beep (default)|beep;Beep-Beep-Beep-Beep|beep4;Escalating Beeps|escalate;Bell|bell",
+                        "value": "beep"
+                    },
+                    {
+                        "name": "start_quiet",
+                        "type": "checkbox",
+                        "label": "Start Quietly, Grow Louder",
+                        "value": "false"
+                    }
+                ]
+            }
+        ]
+    }
+}
