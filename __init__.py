@@ -85,7 +85,7 @@ class AlarmSkill(MycroftSkill):
             except Exception as e:
                 self.log.error('Couldn\'t allocate mixer, {}'.format(repr(e)))
                 self.mixer = None
-        self.restore_volume = None
+        self.saved_volume = None
 
         # Alarm list format [(timestamp, repeat_rule[, timestamp2]), ...]
         # where:
@@ -265,6 +265,7 @@ class AlarmSkill(MycroftSkill):
 
         # Verify time
         alarm_time = when[0]
+        confirmed_time = False
         while not when or when[0] == now[0]:
             if recurrence:
                 t = nice_time(alarm_time, use_ampm=True)
@@ -278,6 +279,7 @@ class AlarmSkill(MycroftSkill):
                 return
             if conf == 'yes':
                 when = [alarm_time]
+                confirmed_time = True
             else:
                 # check if a new (corrected) time was given
                 when = extract_datetime(conf)
@@ -294,7 +296,11 @@ class AlarmSkill(MycroftSkill):
 
         # Don't want to hide the animation
         self.enclosure.deactivate_mouth_events()
-        self.speak_dialog("alarm.scheduled")
+        if confirmed_time:
+            self.speak_dialog("alarm.scheduled")
+        else:
+            t = nice_date_time(alarm_time, now=now[0], use_ampm=True)
+            self.speak_dialog("alarm.scheduled.for.time", data={'time': t})
         self._show_alarm_anim(alarm_time)
         self.enclosure.activate_mouth_events()
 
@@ -554,24 +560,21 @@ class AlarmSkill(MycroftSkill):
             self.sound_repeat = self.sound_interval["constant_beep"]
 
         if self.settings['start_quiet'] and self.mixer:
-            if not self.restore_volume:  # don't if already lowered and saved!
-                self.restore_volume = self.mixer.getvolume()
+            if not self.saved_volume:  # don't overwrite if already saved!
+                self.saved_volume = self.mixer.getvolume()
                 self.volume = 0    # increase by 10% each pass
         else:
-            self.restore_volume = None
+            self.saved_volume = None
 
         self._play_beep()
 
     def _stop_expired_alarm(self):
         if self.has_expired_alarm():
+            self.cancel_scheduled_event('Beep')
             if self.beep_process:
                 self.beep_process.kill()
                 self.beep_process = None
-            self.cancel_scheduled_event('Beep')
-
-            if self.restore_volume:
-                self.mixer.setvolume(self.restore_volume[0])
-                self.restore_volume = None
+            self._restore_volume()
 
             self.cancel_scheduled_event('NextAlarm')
             self._curate_alarms(0)
@@ -579,6 +582,12 @@ class AlarmSkill(MycroftSkill):
             return True
         else:
             return False
+
+    def _restore_volume(self):
+        # Return global volume to the appropriate level if we've messed with it
+        if self.saved_volume:
+            self.mixer.setvolume(self.saved_volume[0])
+            self.saved_volume = None
 
     @intent_file_handler('snooze.intent')
     def snooze_alarm(self, message):
@@ -589,6 +598,7 @@ class AlarmSkill(MycroftSkill):
         if self.beep_process:
             self.beep_process.kill()
             self.beep_process = None
+        self._restore_volume()
 
         utt = message.data.get('utterance') or ""
         snooze_for = extract_number(utt)
@@ -620,7 +630,7 @@ class AlarmSkill(MycroftSkill):
             self.beep_process.kill()
 
         # Increase volume each pass until fully on
-        if self.restore_volume:
+        if self.saved_volume:
             if self.volume < 90:
                 self.volume += 10
             self.mixer.setvolume(self.volume)
