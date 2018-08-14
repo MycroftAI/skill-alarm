@@ -1,7 +1,6 @@
 {
     "utterance": "cancel all alarms",
-    "intent_type": "handle_delete_all",
+    "intent_type": "delete.all.intent",
     "expected_dialog": "ask.cancel.alarm.plural",
-    "responses": ["yes"],
-    "expected_dialog": "alarms.cancelled"
+    "responses": ["yes"]
 }
