@@ -1,8 +1,6 @@
 {
     "utterance": "set an alarm",
     "intent_type": "handle_set_alarm",
-    "expected_dialog": "query.for.when",
     "responses": ["8 pm thursday","yes"],
-    "expected_dialog": "confirm.alarm",
-    "expected_dialog": "alarm.scheduled"
+    "expected_dialog": "alarm.scheduled.for.time"
 }
