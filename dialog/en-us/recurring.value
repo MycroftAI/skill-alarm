@@ -13,7 +13,10 @@ saturday,6
 saturdays,6
 sunday,0
 sundays,0
+weekday,1 2 3 4 5
 weekdays,1 2 3 4 5
+weekend,0 6
 weekends,0 6
+daily,0 1 2 3 4 5 6
 every day,0 1 2 3 4 5 6
 everyday,0 1 2 3 4 5 6

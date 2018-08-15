@@ -49,9 +49,11 @@ from mycroft.util.time import (
 # Set a recurring alarm for weekdays at 7
 # snooze for 15 minutes
 # set an alarm for 20 seconds from now
-#
+# Set an alarm every monday at 7
+# #
 # TODO:
 # Set a recurring alarm for mondays and wednesdays at 7
+# Set an alarm for 10 am every weekday  - Adapt is missing "every"
 
 class AlarmSkill(MycroftSkill):
 
@@ -125,12 +127,6 @@ class AlarmSkill(MycroftSkill):
         self.register_entity_file('daytype.entity')  # TODO: Keep?
         self.recurrence_dict = self.translate_namedvalues('recurring')
 
-        # TODO: convert old alarms:
-        # for alarm in self.settings.get('alarms', []):
-        #    t = alarm[0]
-        # for alarm in self.settings.get('repeat_alarms', []):
-        #    t = alarm[0]
-
         # Time is the first value, so this will sort alarms by time
         self.settings["alarm"].sort()
 
@@ -142,11 +138,13 @@ class AlarmSkill(MycroftSkill):
 
     def set_alarm(self, when, repeat=None):
         if repeat:
-            self.settings["alarm"].append(
-                    self._create_recurring_alarm(when, repeat))
+            alarm = self._create_recurring_alarm(when, repeat)
         else:
-            self.settings["alarm"].append([to_utc(when).timestamp(), ""])
+            alarm = [to_utc(when).timestamp(), ""]
+
+        self.settings["alarm"].append(alarm)
         self._schedule()
+        return alarm
 
     def _schedule(self):
         # cancel any existing timed event
@@ -290,16 +288,16 @@ class AlarmSkill(MycroftSkill):
                 when = None  # reverify
 
         if not recurrence:
-            self.set_alarm(alarm_time)
+            alarm = self.set_alarm(alarm_time)
         else:
-            self.set_alarm(alarm_time, repeat=recurrence)
+            alarm = self.set_alarm(alarm_time, repeat=recurrence)
 
         # Don't want to hide the animation
         self.enclosure.deactivate_mouth_events()
         if confirmed_time:
             self.speak_dialog("alarm.scheduled")
         else:
-            t = nice_date_time(alarm_time, now=now[0], use_ampm=True)
+            t = self._describe(alarm)
             self.speak_dialog("alarm.scheduled.for.time", data={'time': t})
         self._show_alarm_anim(alarm_time)
         self.enclosure.activate_mouth_events()
