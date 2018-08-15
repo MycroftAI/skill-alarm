@@ -1,6 +1,0 @@
-(setze|) (einen|ein|) (alarm|) (für|um|auf|)  jeden {daytype} ({ampm}|) um {time} (Uhr | )
-(setze|) (einen|ein|) (alarm|) (für|um|auf|) {time}({ampm}|) (alarm|) (für|) jeden {daytype}
-(setze|) (einen|ein|) {time} ({ampm}|) (alarm|) (für|an|auf|) jeden {daytype}
-(setze|) (einen|ein|) (wiederkehrend | periodisch|)  {time} ({ampm}|) alarm (für|an|auf|) {daytype}
-(setze|) (einen|ein|) (wiederkehrenden | periodischen|) alarm (für|um|auf|) {time}({ampm}| {ampm}|) (|) {daytype}
-(setze|) (einen|ein|) alarm jeden {daytype} (um|für|auf|) {time} ({ampm}|)
