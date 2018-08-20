@@ -24,6 +24,6 @@ You can choose from four different alarm sounds:
 * "Snooze for 30 minutes"
 
 ## Credits
-Mycroft AI Inc
+@MycroftAI
 
 Alarm sounds from FreeSound.org thanks to [PlayPauseAndRewind](https://freesound.org/people/PlayPauseAndRewind/), [israra](https://freesound.org/people/israra/), [kwahmah_02](https://freesound.org/people/kwahmah_02/), [joedeshon](https://freesound.org/people/joedeshon/)
