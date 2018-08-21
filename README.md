@@ -1,4 +1,4 @@
-## Alarm Skill
+## Set alarms
 Set alarms with Mycroft
 
 ## Description
