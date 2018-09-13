@@ -20,19 +20,19 @@ from pytz import timezone
 import os.path
 from alsaaudio import Mixer
 
-from mycroft import MycroftSkill, intent_handler
-from mycroft.util import play_wav, play_mp3
-from mycroft.util.parse import fuzzy_match, extract_datetime, extract_number
-from mycroft.util.format import nice_date_time, nice_time
-from mycroft.audio import wait_while_speaking
 from adapt.intent import IntentBuilder
-from mycroft import intent_file_handler
+from mycroft import MycroftSkill, intent_handler, intent_file_handler
+from mycroft.audio import wait_while_speaking
+from mycroft.configuration.config import LocalConf, USER_CONFIG
+from mycroft.messagebus.message import Message
+from mycroft.util import play_wav, play_mp3
+from mycroft.util.format import nice_date_time, nice_time
 from mycroft.util.log import LOG
+from mycroft.util.parse import fuzzy_match, extract_datetime, extract_number
 from dateutil.parser import parse
 from dateutil.rrule import rrulestr
 from mycroft.util.time import (
     to_utc, default_timezone, to_local, now_local, now_utc)
-
 
 # WORKING:
 # Set an alarm
@@ -64,6 +64,9 @@ class AlarmSkill(MycroftSkill):
         self.settings['alarms'] = []    # OLD, [(str(datetime),name), ...]
         self.settings['repeat_alarms'] = []
 
+        self.settings['max_alarm_secs'] = 10*60  # max time to beep: 10 min
+        self.beep_start_time = None
+
         # Seconds of gap between sound repeats.
         # The value name must match an option from the 'sound' value of the
         # settingmeta.json, which also corresponds to the name of an mp3
@@ -77,7 +80,7 @@ class AlarmSkill(MycroftSkill):
         }
         # default sound is 'constant_beep'
         self.settings['sound'] = 'constant_beep'
-        self.settings['start_quiet'] = False
+        self.settings['start_quiet'] = True
         try:
             self.mixer = Mixer()
         except Exception:
@@ -298,7 +301,9 @@ class AlarmSkill(MycroftSkill):
             self.speak_dialog("alarm.scheduled")
         else:
             t = self._describe(alarm)
-            self.speak_dialog("alarm.scheduled.for.time", data={'time': t})
+            reltime = nice_relative_time(datetime.fromtimestamp(alarm[0]))
+            self.speak_dialog("alarm.scheduled.for.time",
+                              data={"time": t, "rel": reltime})
         self._show_alarm_anim(alarm_time)
         self.enclosure.activate_mouth_events()
 
@@ -408,6 +413,22 @@ class AlarmSkill(MycroftSkill):
         else:
             dt = datetime.fromtimestamp(alarm[0], default_timezone())
             return nice_date_time(dt, now=now_local(), use_ampm=True)
+
+    @intent_file_handler('query.next.alarm.intent')
+    def handle_query_next(self, message):
+        total = len(self.settings["alarm"])
+        if not total:
+            self.speak_dialog("alarms.list.empty")
+            return
+
+        alarm = self.settings["alarm"][0]
+
+        timestamp_time = alarm[0]
+        alarm_local = datetime.fromtimestamp(timestamp_time)
+        reltime = nice_relative_time(alarm_local)
+
+        self.speak_dialog("next.alarm", data={"when": self._describe(alarm),
+                                              "duration": reltime})
 
     @intent_file_handler('alarm.status.intent')
     def handle_status(self, message):
@@ -542,6 +563,13 @@ class AlarmSkill(MycroftSkill):
                 self.speak_dialog("alarm.cancelled", data={'desc': desc})
                 return
 
+            # Attempt to match by words, e.g. "all", "both"
+            if self.voc_match(resp, 'All'):
+                self.settings["alarm"] = []
+                self._schedule()
+                self.speak_dialog('alarms.cancelled')
+                return
+
             # Failed to delete
             self.speak_dialog("alarm.not.found")
 
@@ -564,15 +592,18 @@ class AlarmSkill(MycroftSkill):
         else:
             self.saved_volume = None
 
+        self._disable_listen_beep()
         self._play_beep()
 
     def _stop_expired_alarm(self):
         if self.has_expired_alarm():
             self.cancel_scheduled_event('Beep')
+            self.beep_start_time = None
             if self.beep_process:
                 self.beep_process.kill()
                 self.beep_process = None
             self._restore_volume()
+            self._restore_listen_beep()
 
             self.cancel_scheduled_event('NextAlarm')
             self._curate_alarms(0)
@@ -587,6 +618,41 @@ class AlarmSkill(MycroftSkill):
             self.mixer.setvolume(self.saved_volume[0])
             self.saved_volume = None
 
+    def _disable_listen_beep(self):
+        user_config = LocalConf(USER_CONFIG)
+
+        if not 'user_beep_setting' in self.settings:
+            self.log.info("Saving beep settings.....")
+            # Save any current local config setting
+            self.settings['user_beep_setting'] = user_config.get("confirm_listening", None)
+
+            # Disable in local config
+            user_config.merge({"confirm_listening": False})
+            user_config.store()
+
+            # Notify all processes to update their loaded configs
+            self.emitter.emit(Message('configuration.updated'))
+            self.log.info("Done")
+
+    def _restore_listen_beep(self):
+        if 'user_beep_setting' in self.settings:
+            self.log.info("Restoring beep settings.....")
+            # Wipe from local config
+            new_conf_values = {"confirm_listening": False}
+            user_config = LocalConf(USER_CONFIG)
+
+            if self.settings["user_beep_setting"] is None:
+                del user_config["confirm_listening"]
+            else:
+                user_config.merge({"confirm_listening":
+                                   self.settings["user_beep_setting"]})
+            user_config.store()
+
+            # Notify all processes to update their loaded configs
+            self.emitter.emit(Message('configuration.updated'))
+            del self.settings["user_beep_setting"]
+            self.log.info("Done")
+
     @intent_file_handler('snooze.intent')
     def snooze_alarm(self, message):
         if not self.has_expired_alarm():
@@ -597,6 +663,7 @@ class AlarmSkill(MycroftSkill):
             self.beep_process.kill()
             self.beep_process = None
         self._restore_volume()
+        self._restore_listen_beep()
 
         utt = message.data.get('utterance') or ""
         snooze_for = extract_number(utt)
@@ -622,7 +689,17 @@ class AlarmSkill(MycroftSkill):
 
     def _play_beep(self):
         """ Play alarm sound file """
-        next_beep = now_utc() + timedelta(seconds=(self.sound_repeat))
+        now = now_utc()
+
+        if not self.beep_start_time:
+            self.beep_start_time = now
+        elif (now - self.beep_start_time).total_seconds() > self.settings["max_alarm_secs"]:
+            # alarm has been running long enough, auto-quiet it
+            self.log.info("Automatically quieted alarm after 10 minutes")
+            self._stop_expired_alarm()
+            return
+
+        next_beep = now + timedelta(seconds=(self.sound_repeat))
         self.schedule_event(self._play_beep, next_beep, name='Beep')
         if self.beep_process:
             self.beep_process.kill()
@@ -635,6 +712,10 @@ class AlarmSkill(MycroftSkill):
 
         self.beep_process = play_mp3(self.sound_file)
 
+        # Listen for cries of "Stop!!!"
+        #if not self.is_listening:
+        self.bus.emit(Message('mycroft.mic.listen'))
+
     @intent_file_handler('stop.intent')
     def handle_alternative_stop(self, message):
         self.stop()
@@ -645,3 +726,46 @@ class AlarmSkill(MycroftSkill):
 
 def create_skill():
     return AlarmSkill()
+
+
+##########################################################################
+# TODO: Move to mycroft.util.format and support translation
+
+def nice_relative_time(when, lang="en-us"):
+    """ Create a relative phrase to roughly describe a datetime
+
+    Examples are "25 seconds", "tomorrow", "7 days".
+
+    Args:
+        when (datetime): Local timezone
+        lang (str, optional): Defaults to "en-us".
+        speech (bool, optional): Defaults to True.
+    Returns:
+        str: description of the given time
+    """
+    now = now_local()
+    delta = (to_local(when) - now)
+
+    if delta.total_seconds() < 1:
+        return "now"
+
+    if delta.total_seconds() < 90:
+        return "{} seconds".format(int(delta.total_seconds()))
+
+    minutes = int(delta.total_seconds() // 60)
+    if minutes < 90:
+        return "{} minutes".format(minutes)
+
+    hours = int(minutes // 60)
+    if hours < 36:
+        return "{} hours".format(hours)
+
+    # TODO: "2 weeks", "3 months", "4 years", etc
+    return "{} days".format(int(hours // 24))
+
+
+
+
+
+
+
