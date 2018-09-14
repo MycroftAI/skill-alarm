@@ -82,7 +82,8 @@ class AlarmSkill(MycroftSkill):
             "bell": 9.07,
             "escalate": 40.0,
             "constant_beep": 10.0,
-            "beep4": 7.0
+            "beep4": 7.0,
+            "chimes": 30.0
         }
         # default sound is 'constant_beep'
         self.settings['sound'] = 'constant_beep'
