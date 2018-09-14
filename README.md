@@ -1,16 +1,17 @@
 # <img src='https://rawgithub.com/FortAwesome/Font-Awesome/master/advanced-options/raw-svg/solid/clock.svg' card_color='#22a7f0' width='50' height='50' style='vertical-align:bottom'/> Set alarms
 Set alarms with Mycroft
 
-## About 
+## About
 Set a single use alarm, daily alarms, or weekly recurring alarms.
- 
- You can choose from four different alarm sounds:
+
+ You can choose from five different alarm sounds:
  * Constant Beep
  * Four rapid beeps
  * Escalating beeps
  * Alarm bell
+ * Gentle chimes
 
-## Examples 
+## Examples
 * "Set an alarm for 9:30 am"
 * "Set an alarm" (Mycroft will prompt for more information)"
 * "Set an alarm for weekdays at 7 in the morning"
@@ -22,7 +23,8 @@ Set a single use alarm, daily alarms, or weekly recurring alarms.
 * "Cancel my 10:00 am alarm"
 * "Snooze for 30 minutes"
 
-## Credits 
+## Credits
+Mycroft AI (@MycroftAI)
 
 ## Category
 **Daily**
