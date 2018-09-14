@@ -13,10 +13,8 @@
 # limitations under the License.
 
 import time
-import arrow
 from os.path import join, abspath, dirname
 from datetime import datetime, timedelta
-from pytz import timezone
 import os.path
 from alsaaudio import Mixer
 
@@ -52,8 +50,16 @@ from mycroft.util.time import (
 # Set an alarm every monday at 7
 # #
 # TODO:
-# Set a recurring alarm for mondays and wednesdays at 7
-# Set an alarm for 10 am every weekday  - Adapt is missing "every"
+# "Set a recurring alarm for mondays and wednesdays at 7"
+# "Set an alarm for 10 am every weekday  - Adapt is missing "every""
+# TODO: Context - save the alarm found in queries as context
+#   When is the next alarm
+#   >  7pm tomorrow
+#   Cancel it
+# TODO:
+#   Interact with date/time to show a dot in the upper-right corner when alarm
+#   is set.  Define a custom messagebus message
+
 
 class AlarmSkill(MycroftSkill):
 
@@ -302,8 +308,13 @@ class AlarmSkill(MycroftSkill):
         else:
             t = self._describe(alarm)
             reltime = nice_relative_time(datetime.fromtimestamp(alarm[0]))
-            self.speak_dialog("alarm.scheduled.for.time",
-                              data={"time": t, "rel": reltime})
+            if recurrence:
+                self.speak_dialog("recurring.alarm.scheduled.for.time",
+                                  data={"time": t, "rel": reltime})
+            else:
+                self.speak_dialog("alarm.scheduled.for.time",
+                                  data={"time": t, "rel": reltime})
+
         self._show_alarm_anim(alarm_time)
         self.enclosure.activate_mouth_events()
 
@@ -311,36 +322,22 @@ class AlarmSkill(MycroftSkill):
     def use_24hour(self):
         return self.config_core.get('time_format') == 'full'
 
+    def _flash_alarm(self, message):
+        # draw on the display
+        if self.flash_on:
+            alarm_timestamp = message.data["alarm_time"]
+            dt = to_local(datetime.fromtimestamp(alarm_timestamp))
+            self._render_time(dt)
+        else:
+            self.enclosure.mouth_reset()
+
+        self.flash_on = not self.flash_on
+
     def _show_alarm_anim(self, dt):
         # Animated confirmation of the alarm
         self.enclosure.mouth_reset()
 
-        # Show the time in numbers "8:00 AM"
-        timestr = nice_time(dt, speech=False, use_ampm=True,
-                            use_24hour=self.use_24hour)
-        x = 16 - ((len(timestr)*4) // 2)  # centers on display
-        if not self.use_24hour:
-            x += 1  # account for wider letters P and M, offset by the colon
-
-        # draw on the display
-        for ch in timestr:
-            # deal with some odd characters that can break filesystems
-            if ch == ":":
-                png = "colon.png"
-                w = 2
-            elif ch == " ":
-                png = "blank.png"
-                w = 2
-            elif ch == 'A' or ch == 'P' or ch == 'M':
-                png = ch+".png"
-                w = 5
-            else:
-                png = ch+".png"
-                w = 4
-
-            png = join(abspath(dirname(__file__)), "anim", png)
-            self.enclosure.mouth_display_png(png, x=x, y=2, refresh=False)
-            x += w
+        self._render_time(dt)
         time.sleep(2)
         self.enclosure.mouth_reset()
 
@@ -375,6 +372,34 @@ class AlarmSkill(MycroftSkill):
             else:
                 time.sleep(0.15)
         self.enclosure.mouth_reset()
+
+    def _render_time(self, datetime):
+        # Show the time in numbers "8:00 AM"
+        timestr = nice_time(datetime, speech=False, use_ampm=True,
+                            use_24hour=self.use_24hour)
+        x = 16 - ((len(timestr)*4) // 2)  # centers on display
+        if not self.use_24hour:
+            x += 1  # account for wider letters P and M, offset by the colon
+
+        # draw on the display
+        for ch in timestr:
+            # deal with some odd characters that can break filesystems
+            if ch == ":":
+                png = "colon.png"
+                w = 2
+            elif ch == " ":
+                png = "blank.png"
+                w = 2
+            elif ch == 'A' or ch == 'P' or ch == 'M':
+                png = ch+".png"
+                w = 5
+            else:
+                png = ch+".png"
+                w = 4
+
+            png = join(abspath(dirname(__file__)), "anim", png)
+            self.enclosure.mouth_display_png(png, x=x, y=2, refresh=False)
+            x += w
 
     def _describe(self, alarm):
         if alarm[1]:
@@ -595,15 +620,31 @@ class AlarmSkill(MycroftSkill):
         self._disable_listen_beep()
         self._play_beep()
 
+        self.flash_on = False
+        self.enclosure.deactivate_mouth_events()
+        alarm = self.settings["alarm"][0]
+        self.schedule_repeating_event(self._flash_alarm, 0, 1,
+                                      name='Flash',
+                                      data={"alarm_time": alarm[0]})
+
+    def __end_beep(self):
+        self.cancel_scheduled_event('Beep')
+        self.beep_start_time = None
+        if self.beep_process:
+            self.beep_process.kill()
+            self.beep_process = None
+        self._restore_volume()
+        self._restore_listen_beep()
+
+    def __end_flash(self):
+        self.cancel_scheduled_event('Flash')
+        self.enclosure.mouth_reset()
+        self.enclosure.activate_mouth_events()
+
     def _stop_expired_alarm(self):
         if self.has_expired_alarm():
-            self.cancel_scheduled_event('Beep')
-            self.beep_start_time = None
-            if self.beep_process:
-                self.beep_process.kill()
-                self.beep_process = None
-            self._restore_volume()
-            self._restore_listen_beep()
+            self.__end_beep()
+            self.__end_flash()
 
             self.cancel_scheduled_event('NextAlarm')
             self._curate_alarms(0)
@@ -621,8 +662,7 @@ class AlarmSkill(MycroftSkill):
     def _disable_listen_beep(self):
         user_config = LocalConf(USER_CONFIG)
 
-        if not 'user_beep_setting' in self.settings:
-            self.log.info("Saving beep settings.....")
+        if 'user_beep_setting' not in self.settings:
             # Save any current local config setting
             self.settings['user_beep_setting'] = user_config.get("confirm_listening", None)
 
@@ -631,12 +671,10 @@ class AlarmSkill(MycroftSkill):
             user_config.store()
 
             # Notify all processes to update their loaded configs
-            self.emitter.emit(Message('configuration.updated'))
-            self.log.info("Done")
+            self.bus.emit(Message('configuration.updated'))
 
     def _restore_listen_beep(self):
         if 'user_beep_setting' in self.settings:
-            self.log.info("Restoring beep settings.....")
             # Wipe from local config
             new_conf_values = {"confirm_listening": False}
             user_config = LocalConf(USER_CONFIG)
@@ -649,21 +687,16 @@ class AlarmSkill(MycroftSkill):
             user_config.store()
 
             # Notify all processes to update their loaded configs
-            self.emitter.emit(Message('configuration.updated'))
+            self.bus.emit(Message('configuration.updated'))
             del self.settings["user_beep_setting"]
-            self.log.info("Done")
 
     @intent_file_handler('snooze.intent')
     def snooze_alarm(self, message):
         if not self.has_expired_alarm():
             return
 
-        self.cancel_scheduled_event('Beep')
-        if self.beep_process:
-            self.beep_process.kill()
-            self.beep_process = None
-        self._restore_volume()
-        self._restore_listen_beep()
+        self.__end_beep()
+        self.__end_flash()
 
         utt = message.data.get('utterance') or ""
         snooze_for = extract_number(utt)
@@ -713,7 +746,6 @@ class AlarmSkill(MycroftSkill):
         self.beep_process = play_mp3(self.sound_file)
 
         # Listen for cries of "Stop!!!"
-        #if not self.is_listening:
         self.bus.emit(Message('mycroft.mic.listen'))
 
     @intent_file_handler('stop.intent')
@@ -750,22 +782,28 @@ def nice_relative_time(when, lang="en-us"):
         return "now"
 
     if delta.total_seconds() < 90:
-        return "{} seconds".format(int(delta.total_seconds()))
+        if delta.total_seconds() == 1:
+            return "one second"
+        else:
+            return "{} seconds".format(int(delta.total_seconds()))
 
     minutes = int(delta.total_seconds() // 60)
     if minutes < 90:
-        return "{} minutes".format(minutes)
+        if minutes == 1:
+            return "one minute"
+        else:
+            return "{} minutes".format(minutes)
 
     hours = int(minutes // 60)
     if hours < 36:
-        return "{} hours".format(hours)
+        if hours == 1:
+            return "one hour"
+        else:
+            return "{} hours".format(hours)
 
     # TODO: "2 weeks", "3 months", "4 years", etc
-    return "{} days".format(int(hours // 24))
-
-
-
-
-
-
-
+    days = int(hours // 24)
+    if days == 1:
+        return "1 day"
+    else:
+        return "{} days".format(days)
