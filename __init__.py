@@ -119,13 +119,12 @@ class AlarmSkill(MycroftSkill):
         self.log.info(self.settings["alarm"])
         idx = 1
         for alarm in self.settings["alarm"]:
-            timestamp_time = alarm[0]
-            dt = datetime.fromtimestamp(timestamp_time)
+            dt = self.get_alarm_local(alarm)
             self.log.info(str(idx) + " - " + str(alarm) +
                           "  U" + str(dt) + " L" + str(to_local(dt)))
             idx += 1
 
-        now_ts = now_utc().timestamp()
+        now_ts = to_utc(now_utc()).timestamp()
         dt = datetime.fromtimestamp(now_ts)
         self.log.info("-"*40)
         self.log.info("NOW: " + str(now_ts) +
@@ -146,6 +145,13 @@ class AlarmSkill(MycroftSkill):
 
         self._schedule()
 
+    def get_alarm_local(self, alarm=None, timestamp=None):
+        if timestamp:
+            ts = timestamp
+        else:
+            ts = alarm[0]
+        return datetime.fromtimestamp(ts, default_timezone())
+
     def set_alarm(self, when, repeat=None):
         if repeat:
             alarm = self._create_recurring_alarm(when, repeat)
@@ -163,10 +169,9 @@ class AlarmSkill(MycroftSkill):
 
         # set timed event for next alarm (if it exists)
         if self.settings["alarm"]:
-            timestamp_time = self.settings["alarm"][0][0]
-            dt = datetime.fromtimestamp(timestamp_time)
+            dt = self.get_alarm_local(self.settings["alarm"][0])
             self.schedule_event(self._alarm_expired,
-                                to_utc(dt),
+                                dt,
                                 name='NextAlarm')
 
     def _curate_alarms(self, curation_limit=1):
@@ -175,7 +180,7 @@ class AlarmSkill(MycroftSkill):
                                             remove the alarm
         """
         alarms = []
-        now_ts = now_utc().timestamp()
+        now_ts = to_utc(now_utc()).timestamp()
         for alarm in self.settings["alarm"]:
             if alarm[0] < now_ts:
                 if alarm[0] < (now_ts - curation_limit):
@@ -227,7 +232,7 @@ class AlarmSkill(MycroftSkill):
         if not self.settings["alarm"]:
             return False
 
-        now_ts = now_utc().timestamp()
+        now_ts = to_utc(now_utc()).timestamp()
         for alarm in self.settings["alarm"]:
             if alarm[0] <= now_ts:
                 return True
@@ -308,7 +313,7 @@ class AlarmSkill(MycroftSkill):
             self.speak_dialog("alarm.scheduled")
         else:
             t = self._describe(alarm)
-            reltime = nice_relative_time(datetime.fromtimestamp(alarm[0]))
+            reltime = nice_relative_time(self.get_alarm_local(alarm))
             if recurrence:
                 self.speak_dialog("recurring.alarm.scheduled.for.time",
                                   data={"time": t, "rel": reltime})
@@ -327,7 +332,7 @@ class AlarmSkill(MycroftSkill):
         # draw on the display
         if self.flash_on:
             alarm_timestamp = message.data["alarm_time"]
-            dt = to_local(datetime.fromtimestamp(alarm_timestamp))
+            dt = self.get_alarm_local(timestamp=alarm_timestamp)
             self._render_time(dt)
         else:
             self.enclosure.mouth_reset()
@@ -432,12 +437,12 @@ class AlarmSkill(MycroftSkill):
             else:
                 desc = "repeats"
 
-            dt = datetime.fromtimestamp(alarm[0], default_timezone())
+            dt = self.get_alarm_local(alarm)
             return self.translate('recurring.alarm',
                                   data={'time': nice_time(dt, use_ampm=True),
                                         'recurrence': desc})
         else:
-            dt = datetime.fromtimestamp(alarm[0], default_timezone())
+            dt = self.get_alarm_local(alarm)
             return nice_date_time(dt, now=now_local(), use_ampm=True)
 
     @intent_file_handler('query.next.alarm.intent')
@@ -448,10 +453,7 @@ class AlarmSkill(MycroftSkill):
             return
 
         alarm = self.settings["alarm"][0]
-
-        timestamp_time = alarm[0]
-        alarm_local = datetime.fromtimestamp(timestamp_time)
-        reltime = nice_relative_time(alarm_local)
+        reltime = nice_relative_time(self.get_alarm_local(alarm))
 
         self.speak_dialog("next.alarm", data={"when": self._describe(alarm),
                                               "duration": reltime})
@@ -510,7 +512,7 @@ class AlarmSkill(MycroftSkill):
             search = when[0]
             for alarm in self.settings["alarm"]:
                 # TODO: Handle repeating desc
-                dt = datetime.fromtimestamp(alarm[0], default_timezone())
+                dt = self.get_alarm_local(alarm)
                 delta = search - dt
                 delta2 = dt - search
                 if (abs(delta.total_seconds()) < 60 or
@@ -555,7 +557,7 @@ class AlarmSkill(MycroftSkill):
                 search = when[0]
                 for alarm in self.settings["alarm"]:
                     # TODO: Handle repeating desc
-                    dt = datetime.fromtimestamp(alarm[0], default_timezone())
+                    dt = self.get_alarm_local(alarm)
                     delta = search - dt
                     delta2 = dt - search
                     if (abs(delta.total_seconds()) < 60 or
@@ -706,7 +708,7 @@ class AlarmSkill(MycroftSkill):
 
         # Snooze always applies the the first alarm in the sorted array
         alarm = self.settings["alarm"][0]
-        dt = datetime.fromtimestamp(alarm[0])
+        dt = self.get_alarm_local(alarm)
         snooze = to_utc(dt) + timedelta(minutes=snooze_for)
 
         if len(alarm) < 3:
@@ -723,7 +725,7 @@ class AlarmSkill(MycroftSkill):
 
     def _play_beep(self):
         """ Play alarm sound file """
-        now = now_utc()
+        now = now_local()
 
         if not self.beep_start_time:
             self.beep_start_time = now
@@ -788,14 +790,14 @@ def nice_relative_time(when, lang="en-us"):
         else:
             return "{} seconds".format(int(delta.total_seconds()))
 
-    minutes = int(delta.total_seconds() // 60)
+    minutes = int((delta.total_seconds()+30) // 60)
     if minutes < 90:
         if minutes == 1:
             return "one minute"
         else:
             return "{} minutes".format(minutes)
 
-    hours = int(minutes // 60)
+    hours = int((minutes+30) // 60)
     if hours < 36:
         if hours == 1:
             return "one hour"
@@ -803,7 +805,7 @@ def nice_relative_time(when, lang="en-us"):
             return "{} hours".format(hours)
 
     # TODO: "2 weeks", "3 months", "4 years", etc
-    days = int(hours // 24)
+    days = int((hours+12) // 24)
     if days == 1:
         return "1 day"
     else:
