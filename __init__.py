@@ -32,6 +32,24 @@ from dateutil.rrule import rrulestr
 from mycroft.util.time import (
     to_utc, default_timezone, to_local, now_local, now_utc)
 
+try:
+    from mycroft.util.time import to_system
+except:
+    # Until to_system is included in 18.08.3, define it here too
+    from dateutil.tz import gettz, tzlocal
+    def to_system(dt):
+        """ Convert a datetime to the system's local timezone
+        Args:
+            dt (datetime): A datetime (if no timezone, assumed to be UTC)
+        Returns:
+            (datetime): time converted to the local timezone
+        """
+        tz = tzlocal()
+        if dt.tzinfo:
+            return dt.astimezone(tz)
+        else:
+            return dt.replace(tzinfo=gettz("UTC")).astimezone(tz)
+
 # WORKING:
 # Set an alarm
 #    for 9
@@ -66,12 +84,9 @@ class AlarmSkill(MycroftSkill):
     def __init__(self):
         super(AlarmSkill, self).__init__()
         self.beep_process = None
-        self._should_play_beep = True
-        self.settings['alarms'] = []    # OLD, [(str(datetime),name), ...]
-        self.settings['repeat_alarms'] = []
-
         self.settings['max_alarm_secs'] = 10*60  # max time to beep: 10 min
         self.beep_start_time = None
+        self.flash_state = 0
 
         # Seconds of gap between sound repeats.
         # The value name must match an option from the 'sound' value of the
@@ -109,7 +124,10 @@ class AlarmSkill(MycroftSkill):
         #       iCalendar rule from RFC <https://tools.ietf.org/html/rfc5545>.
         #
         #  timestamp2 is optional, for a recently passed alarm at boot or a
-        #       snoozed alarm
+        #       running or snoozed alarm.  This is the time that is used for
+        #       the repeat.  E.g. your daily alarm is a 24 hours increment
+        #       from when it was set, not 24 hours from when it shut off
+        #       or was snoozed.
         # NOTE: Using list instead of tuple because of serialization
         self.settings["alarm"] = []
 
@@ -145,6 +163,22 @@ class AlarmSkill(MycroftSkill):
 
         self._schedule()
 
+        # TODO: Move is_listening into MycroftSkill and reimplement (signal?)
+        self.is_currently_listening = False
+        self.add_event('recognizer_loop:record_begin', self.on_listen_started)
+        self.add_event('recognizer_loop:record_end', self.on_listen_ended)
+
+    def on_listen_started(self, message):
+        self.log.info("on started...")
+        self.is_currently_listening = True
+
+    def on_listen_ended(self, message):
+        self.log.info("on ended...")
+        self.is_currently_listening = False
+
+    def is_listening(self):
+        return self.is_currently_listening
+
     def get_alarm_local(self, alarm=None, timestamp=None):
         if timestamp:
             ts = timestamp
@@ -171,7 +205,7 @@ class AlarmSkill(MycroftSkill):
         if self.settings["alarm"]:
             dt = self.get_alarm_local(self.settings["alarm"][0])
             self.schedule_event(self._alarm_expired,
-                                dt,
+                                to_system(dt),
                                 name='NextAlarm')
 
     def _curate_alarms(self, curation_limit=1):
@@ -182,10 +216,12 @@ class AlarmSkill(MycroftSkill):
         alarms = []
         now_ts = to_utc(now_utc()).timestamp()
         for alarm in self.settings["alarm"]:
+            # Alarm format == [timestamp, repeat_rule[, orig_alarm_timestamp]]
             if alarm[0] < now_ts:
                 if alarm[0] < (now_ts - curation_limit):
-                    # skip playing an old alarm (but resched if needed)
+                    # skip playing an old alarm
                     if alarm[1]:
+                         # resched in future if repeat rule exists
                         alarms.append(self._next_repeat(alarm))
                 else:
                     # schedule for right now, with the
@@ -330,14 +366,20 @@ class AlarmSkill(MycroftSkill):
 
     def _flash_alarm(self, message):
         # draw on the display
-        if self.flash_on:
-            alarm_timestamp = message.data["alarm_time"]
-            dt = self.get_alarm_local(timestamp=alarm_timestamp)
-            self._render_time(dt)
+        if self.flash_state < 3:
+            if self.flash_state == 0:
+                alarm_timestamp = message.data["alarm_time"]
+                dt = self.get_alarm_local(timestamp=alarm_timestamp)
+                self._render_time(dt)
+            self.flash_state += 1
         else:
             self.enclosure.mouth_reset()
+            self.flash_state = 0
 
-        self.flash_on = not self.flash_on
+        # Listen for cries of "Stop!!!"
+        if not self.is_listening():
+            self.log.info("Auto listen...")
+            self.bus.emit(Message('mycroft.mic.listen'))
 
     def _show_alarm_anim(self, dt):
         # Animated confirmation of the alarm
@@ -389,7 +431,6 @@ class AlarmSkill(MycroftSkill):
 
         # draw on the display
         for ch in timestr:
-            # deal with some odd characters that can break filesystems
             if ch == ":":
                 png = "colon.png"
                 w = 2
@@ -623,7 +664,7 @@ class AlarmSkill(MycroftSkill):
         self._disable_listen_beep()
         self._play_beep()
 
-        self.flash_on = False
+        self.flash_state = 0
         self.enclosure.deactivate_mouth_events()
         alarm = self.settings["alarm"][0]
         self.schedule_repeating_event(self._flash_alarm, 0, 1,
@@ -711,7 +752,7 @@ class AlarmSkill(MycroftSkill):
         dt = self.get_alarm_local(alarm)
         snooze = to_utc(dt) + timedelta(minutes=snooze_for)
 
-        if len(alarm) < 3:
+        if len(alarm) < 2:
             original_time = alarm[0]
         else:
             original_time = alarm[2]  # already snoozed
@@ -723,7 +764,7 @@ class AlarmSkill(MycroftSkill):
                                      original_time]
         self._schedule()
 
-    def _play_beep(self):
+    def _play_beep(self, message=None):
         """ Play alarm sound file """
         now = now_local()
 
@@ -736,7 +777,8 @@ class AlarmSkill(MycroftSkill):
             return
 
         next_beep = now + timedelta(seconds=(self.sound_repeat))
-        self.schedule_event(self._play_beep, next_beep, name='Beep')
+        self.cancel_scheduled_event('Beep')
+        self.schedule_event(self._play_beep, to_system(next_beep), name='Beep')
         if self.beep_process:
             self.beep_process.kill()
 
@@ -747,9 +789,6 @@ class AlarmSkill(MycroftSkill):
             self.mixer.setvolume(self.volume)
 
         self.beep_process = play_mp3(self.sound_file)
-
-        # Listen for cries of "Stop!!!"
-        self.bus.emit(Message('mycroft.mic.listen'))
 
     @intent_file_handler('stop.intent')
     def handle_alternative_stop(self, message):
@@ -790,14 +829,14 @@ def nice_relative_time(when, lang="en-us"):
         else:
             return "{} seconds".format(int(delta.total_seconds()))
 
-    minutes = int((delta.total_seconds()+30) // 60)
+    minutes = int((delta.total_seconds()+30) // 60)  # +30 to round minutes
     if minutes < 90:
         if minutes == 1:
             return "one minute"
         else:
             return "{} minutes".format(minutes)
 
-    hours = int((minutes+30) // 60)
+    hours = int((minutes+30) // 60)  # +30 to round hours
     if hours < 36:
         if hours == 1:
             return "one hour"
@@ -805,7 +844,7 @@ def nice_relative_time(when, lang="en-us"):
             return "{} hours".format(hours)
 
     # TODO: "2 weeks", "3 months", "4 years", etc
-    days = int((hours+12) // 24)
+    days = int((hours+12) // 24)  # +12 to round days
     if days == 1:
         return "1 day"
     else:
