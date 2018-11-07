@@ -1,0 +1,3 @@
+(dag | veckodag | helg)
+(måndag | måndagar | tisdag | tisdagar | onsdag | onsdagar | torsdag | torsdagar | fredag | fredagar | lördag | lördagar | söndag | söndagar)
+(måndag | måndagar | tisdag | tisdagar | onsdag | onsdagar | torsdag | torsdagar | fredag | fredagar | lördag | lördagar | söndag | söndagar) och (måndag | måndagar | tisdag | tisdagar | onsdag | onsdagar | torsdag | torsdagar | fredag | fredagar | lördag | lördagar | söndag | söndagar)
