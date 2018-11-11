@@ -1,3 +1,3 @@
-(tag | wochentag | wochentags | wochenende | wochenenden | morgen | heute)
-(montag  | dienstag  | mittwoch  | donnerstag  | freitag  | samstag  | sonntag )
-(montags  | dienstags  | mittwochs  | donnerstags  | freitags | samstags  | sonntags )
+(Tag | Wochentag | Wochentags | Wochenende | Wochenends | morgen | heute)
+(Montag  |Dienstag  | Mittwoche  | Donnerstag  | Freitag  | Samstag  | Sonntag)
+(Montags  | Dienstags  | Mittwochs  | Donnerstags  |Freitags | Samstags  | Sonntags)
