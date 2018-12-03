@@ -1,3 +1,3 @@
-(Tag | wochentags | wochenende)
-(montag | montage | dienstag | dienstage | mittwoch | mitwoche | donnerstag | donnerstage | freitag | freitage | samstag | samstage | sonntag | sonntage)
-(montag | montage | dienstag | dienstage | mittwoch | mitwoche | donnerstag | donnerstage | freitag | freitage | samstag | samstage | sonntag | sonntage) and (montag | montage | dienstag | dienstage | mittwoch | mitwoche | donnerstag | donnerstage | freitag | freitage | samstag | samstage | sonntag | sonntage)
+(Tag | Wochentag | Wochenende)
+(Montag | Montags | Dienstag | Dienstags | Mittwoch | Mittwochs | Donnerstag | Donnerstags | Freitag | Freitags | Samstag | Samstags | Sonntag | Sonntags)
+(Montag | Montags | Dienstag | Dienstags | Mittwoch | Mittwochs | Donnerstag | Donnerstags | Freitag | Freitags | Samstag | Samstags | Sonntag | Sonntags) und (Montag | Montags | Dienstag | Dienstags | Mittwoch | Mittwochs | Donnerstag | Donnerstags | Freitag | Freitags | Samstag | Samstags | Sonntag | Sonntags)
