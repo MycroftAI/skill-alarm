@@ -304,7 +304,7 @@ class AlarmSkill(MycroftSkill):
 
         # Get the time
         when = extract_datetime(utt)
-        now = extract_datetime("now")
+        now = extract_datetime("dummy")  # Will return dt of unmatched string
         while not when or when[0] == now[0]:
             # No time given, ask for one
             r = self.get_response('query.for.when', num_retries=1)
