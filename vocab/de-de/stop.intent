@@ -1,7 +1,8 @@
-Alarm anhalten
-Alarm ausschalten
-Alarm ausschalten
-deaktiviere (den |) Alarm
-lösche (den |) Alarm
+(Alarm|Wecker) anhalten
+(Alarm|Wecker) ausschalten
+(Alarm|Wecker) ausschalten
+deaktiviere (den |) (Alarm|Wecker)
+lösche (den |) (Alarm|Wecker)
 Ich hab es geschafft
 still sein
+sei still
