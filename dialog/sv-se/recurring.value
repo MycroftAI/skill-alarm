@@ -1,0 +1,23 @@
+# översatta namn, veckodag
+# lista pluralversionen först, resulterar i klockan 7 på fredagar" eller "klockan 7 varje dag"
+måndagar,0
+måndag,0
+tisdagar,1
+tisdag,1
+onsdagar,2
+onsdag,2
+torsdagar,3
+torsdag,3
+fredagar,4
+fredag,4
+lördagar,5
+lördag,5
+söndagar,6
+söndag,6
+veckodagar,0 1 2 3 4
+veckodag,0 1 2 3 4
+helgdagar,5 6
+helgdag,5 6
+varje dag, 0 1 2 3 4 5 6
+varjedag,0 1 2 3 4 5 6
+dagligen,0 1 2 3 4 5 6

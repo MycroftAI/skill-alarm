@@ -1,2 +1,2 @@
-(abbrechen|saubern|entfrenen|löschen) (mein| der | des|) {time} Alarm.
-(abbrechen|säubern|entfernen|löschen) (mein | der| Alarm ( um | für) {time}.
+(Entferne|Lösche) (meinen|den|) {time} (Alarm|Wecker|).
+(entferne|lösche) (mein|meinen | den|) (Alarm|Wecker) ( um | für) {time}.

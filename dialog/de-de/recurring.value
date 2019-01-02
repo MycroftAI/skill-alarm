@@ -1,0 +1,23 @@
+# Übersetzter Name, Tag(e) der Woche
+# Mehrzahl-Version zuerst auflisten, also "7 Uhr an Freitagen" oder "7 Uhr täglich"
+Montags,1
+Montag,1
+Dienstags,2
+Dienstag,2
+Mittwochs,3
+Mittwoch,3
+Donnerstags,4
+Donnerstag,4
+Freitags,5
+Freitag,5
+Samstags,6
+Samstag,6
+Sonntags,0
+Sonntag,0
+Wochentage,1 2 3 4 5
+Wochentag,1 2 3 4 5
+Wochenende,0 6
+Wochenende,0 6
+jeden Tag,0 1 2 3 4 5 6
+jeden Tag,0 1 2 3 4 5 6
+Täglich,0 1 2 3 4 5 6
