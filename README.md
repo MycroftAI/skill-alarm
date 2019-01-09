@@ -1,4 +1,4 @@
-# <img src='https://rawgithub.com/FortAwesome/Font-Awesome/master/advanced-options/raw-svg/solid/clock.svg' card_color='#5B6984' width='50' height='50' style='vertical-align:bottom'/> Set alarms
+# <img src='https://raw.githack.com/FortAwesome/Font-Awesome/master/svgs/solid/clock.svg' card_color='#5B6984' width='50' height='50' style='vertical-align:bottom'/> Set alarms
 Set alarms with Mycroft
 
 ## About
