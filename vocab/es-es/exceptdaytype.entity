@@ -1,0 +1,3 @@
+(día|día laborable|fin de semana)
+(lunes | los lunes | martes | los martes | miércoles | los miércoles | jueves | los jueves | viernes | los viernes | sábado | los sábados | domingo | los domingos)
+(lunes | los lunes | martes | los martes | miércoles | los miércoles | jueves | los jueves | viernes | los viernes | sábado | los sábados | domingo | los domingos) y (lunes | los lunes | martes | los martes | miércoles | los miércoles | jueves | los jueves | viernes | los viernes | sábado | los sábados | domingo | los domingos)

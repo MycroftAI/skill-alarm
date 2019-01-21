@@ -1,0 +1,23 @@
+# nombre traducido, dia(s) de la semana
+# lista primero la versión en plural, así pues sería "7pm los viernes" o "7pm todos los días"
+los lunes,1
+lunes,1
+los martes,2
+martes,2
+los miércoles,3
+miércoles,3
+los jueves,4
+jueves,4
+los viernes,5
+viernes,5
+los sábados,6
+sábado,6
+los domingos,0
+domingo,0
+días laborables,1 2 3 4 5
+día laborable,1 2 3 4 5
+fines de semana,0 6
+fin de semana,0 6
+todos los días,0 1 2 3 4 5 6
+cada día,0 1 2 3 4 5 6
+a diario,0 1 2 3 4 5 6
