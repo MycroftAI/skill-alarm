@@ -482,7 +482,7 @@ class AlarmSkill(MycroftSkill):
                                 day_names.append(r)
                                 break
 
-                    # TODO: Make translatable. mycroft.util.format.join("and")?
+                    # TODO:19.02 - switch to translatable. mycroft.util.format.join(day_names, "and")
                     desc = ", ".join(day_names[:-1]) + " and " + day_names[-1]
             else:
                 desc = "repeats"
