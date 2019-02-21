@@ -565,13 +565,14 @@ class AlarmSkill(MycroftSkill):
                 dt = self.get_alarm_local(alarm)
                 delta = search - dt
                 delta2 = dt - search
+                recurring = ".recurring" if alarm[1] else ""
                 if (abs(delta.total_seconds()) < 60 or
                         abs(delta2.total_seconds()) < 60):
                     # Really close match, just delete it
                     desc = self._describe(alarm)
                     self.settings["alarm"].remove(alarm)
                     self._schedule()
-                    self.speak_dialog("alarm.cancelled.desc",
+                    self.speak_dialog("alarm.cancelled.desc" + recurring,
                                       data={'desc': desc})
                     return
 
@@ -579,20 +580,22 @@ class AlarmSkill(MycroftSkill):
                         abs(delta2.total_seconds()) < 60*60*2):
                     # Not super close, get confirmation
                     desc = self._describe(alarm)
-                    if self.ask_yesno('ask.cancel.desc.alarm',
+                    if self.ask_yesno('ask.cancel.desc.alarm' + recurring,
                                       data={'desc': desc}) == 'yes':
                         self.settings["alarm"].remove(alarm)
                         self._schedule()
-                        self.speak_dialog("alarm.cancelled")
+                        self.speak_dialog("alarm.cancelled" + recurring)
                         return
 
         if total == 1:
-            desc = self._describe(self.settings["alarm"][0])
-            if self.ask_yesno('ask.cancel.desc.alarm',
+            alarm = self.settings["alarm"][0]
+            desc = self._describe(alarm)
+            recurring = ".recurring" if alarm[1] else ""
+            if self.ask_yesno('ask.cancel.desc.alarm' + recurring,
                               data={'desc': desc}) == 'yes':
                 self.settings["alarm"] = []
                 self._schedule()
-                self.speak_dialog("alarm.cancelled")
+                self.speak_dialog("alarm.cancelled" + recurring)
                 return
         else:
             # list the alarms
@@ -610,13 +613,14 @@ class AlarmSkill(MycroftSkill):
                     dt = self.get_alarm_local(alarm)
                     delta = search - dt
                     delta2 = dt - search
+                    recurring = ".recurring" if alarm[1] else ""
                     if (abs(delta.total_seconds()) < 60 or
                             abs(delta2.total_seconds()) < 60):
                         # Really close match, just delete it
                         desc = self._describe(alarm)
                         self.settings["alarm"].remove(alarm)
                         self._schedule()
-                        self.speak_dialog("alarm.cancelled.desc",
+                        self.speak_dialog("alarm.cancelled.desc" + recurring,
                                           data={'desc': desc})
                         return
 
@@ -624,21 +628,23 @@ class AlarmSkill(MycroftSkill):
                             abs(delta2.total_seconds()) < 60*60*2):
                         # Not super close, get confirmation
                         desc = self._describe(alarm)
-                        if self.ask_yesno('ask.cancel.desc.alarm',
+                        if self.ask_yesno('ask.cancel.desc.alarm' + recurring,
                                           data={'desc': desc}) == 'yes':
                             self.settings["alarm"].remove(alarm)
                             self._schedule()
-                            self.speak_dialog("alarm.cancelled")
+                            self.speak_dialog("alarm.cancelled" + recurring)
                             return
 
             # Attempt to delete by spoken index
             idx = extract_number(resp, ordinals=True)
             if idx and idx > 0 and idx <= total:
                 idx = int(idx)
-                desc = self._describe(self.settings["alarm"][idx-1])
+                alarm = self.settings["alarm"][idx-1]
+                desc = self._describe(alarm)
+                recurring = ".recurring" if alarm[1] else ""
                 del self.settings["alarm"][idx-1]
                 self._schedule()
-                self.speak_dialog("alarm.cancelled", data={'desc': desc})
+                self.speak_dialog("alarm.cancelled" + recurring, data={'desc': desc})
                 return
 
             # Attempt to match by words, e.g. "all", "both"
