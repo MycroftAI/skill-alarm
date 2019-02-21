@@ -1,3 +1,4 @@
+# These values must also be supported in the recurring.value file
 recurring
 repeating
 every
@@ -11,3 +12,5 @@ thursdays
 fridays
 saturdays
 sundays
+work days
+workdays

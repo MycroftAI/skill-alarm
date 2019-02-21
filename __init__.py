@@ -192,6 +192,11 @@ class AlarmSkill(MycroftSkill):
         else:
             alarm = [to_utc(when).timestamp(), ""]
 
+        for existing in self.settings["alarm"]:
+            if alarm == existing:
+                self.speak_dialog("alarm.already.exists")
+                return
+
         self.settings["alarm"].append(alarm)
         self._schedule()
         return alarm
@@ -342,6 +347,10 @@ class AlarmSkill(MycroftSkill):
             alarm = self.set_alarm(alarm_time)
         else:
             alarm = self.set_alarm(alarm_time, repeat=recurrence)
+
+        if not alarm:
+            # none set, it was a duplicate
+            return
 
         # Don't want to hide the animation
         self.enclosure.deactivate_mouth_events()
@@ -734,6 +743,14 @@ class AlarmSkill(MycroftSkill):
             self.bus.emit(Message('configuration.updated'))
             del self.settings["user_beep_setting"]
 
+    def converse(self, utterances, lang="en-us"):
+        if self.has_expired_alarm():
+            # An alarm is going off
+            if self.voc_match(utterances[0], "StopBeeping"):
+                # Stop the alarm
+                self._stop_expired_alarm()
+                return True  # and consume this phrase
+
     @intent_file_handler('snooze.intent')
     def snooze_alarm(self, message):
         if not self.has_expired_alarm():
@@ -752,7 +769,7 @@ class AlarmSkill(MycroftSkill):
         dt = self.get_alarm_local(alarm)
         snooze = to_utc(dt) + timedelta(minutes=snooze_for)
 
-        if len(alarm) < 2:
+        if len(alarm) < 3:
             original_time = alarm[0]
         else:
             original_time = alarm[2]  # already snoozed
@@ -789,10 +806,6 @@ class AlarmSkill(MycroftSkill):
             self.mixer.setvolume(self.volume)
 
         self.beep_process = play_mp3(self.sound_file)
-
-    @intent_file_handler('stop.intent')
-    def handle_alternative_stop(self, message):
-        self.stop()
 
     def stop(self):
         return self._stop_expired_alarm()
