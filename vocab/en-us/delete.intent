@@ -1,2 +1,3 @@
-(cancel | clear | remove | erase| delete) (my | the | ) {time} alarm.
-(cancel | clear | remove | erase| delete) (my | the | ) alarm (at|for) {time}.
+(delete|remove|cancel|clear|erase|disable|stop|turn off|abort) (the|my|) alarm
+(delete|remove|cancel|clear|erase|disable|stop|turn off|abort) (the|my|) {time} alarm
+(delete|remove|cancel|clear|erase|disable|stop|turn off|abort) (the|my|) alarm (at|for) {time}
