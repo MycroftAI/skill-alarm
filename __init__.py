@@ -324,6 +324,11 @@ class AlarmSkill(MycroftSkill):
                 if not r:
                     return
                 recurrence = r
+            if self.voc_match(recurrence, "Except"):
+                # TODO: Support exceptions
+                self.speak_dialog("no.exceptions.yet")
+                return
+
 
         # Get the time
         when = extract_datetime(utt)
