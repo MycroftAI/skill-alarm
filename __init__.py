@@ -397,6 +397,19 @@ class AlarmSkill(MycroftSkill):
         if not recur:
             alarm = self.set_alarm(alarm_time)
         else:
+            # TODO/BUG: If someone just does "set recurring alarm", the system
+            # asks independently for days and then for time.  The time is
+            # likely on a day that is future but different from the
+            # recurrance days.
+            #
+            # The problem resolves after the first alarm runs, it reschedules
+            # correctly.  But detecting and/or fixing this is tricky.
+            # Future bug fixers -- don't just subtrack 24 hours from the
+            # alarm_time expecting that to fix things.  If you do that the
+            # day after daylight savings time you will be strangely setting
+            # alarms for one hour off.
+            #
+            # I don't have a great solution for this problem yet.  :-/
             alarm = self.set_alarm(alarm_time, repeat=recur)
 
         if not alarm:
