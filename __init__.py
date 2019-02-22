@@ -282,7 +282,12 @@ class AlarmSkill(MycroftSkill):
         if days:
             rule = "FREQ=WEEKLY;INTERVAL=1;BYDAY=" + ",".join(days)
 
-        return [to_utc(when).timestamp(), rule]
+        alarm = [to_utc(when).timestamp(), rule]
+        now_ts = to_utc(now_utc()).timestamp()
+        if alarm[0] <= now_ts:
+            return self._next_repeat(alarm)
+        else:
+            return alarm
 
     def has_expired_alarm(self):
         # True is an alarm should be 'going off' now.  Snoozed alarms don't
