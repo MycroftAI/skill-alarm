@@ -179,6 +179,14 @@ class AlarmSkill(MycroftSkill):
         self.add_event('recognizer_loop:record_begin', self.on_listen_started)
         self.add_event('recognizer_loop:record_end', self.on_listen_ended)
 
+        # Support query for active alarms from other skills
+        self.add_event('private.mycroftai.has_alarm', self.on_has_alarm)
+
+    def on_has_alarm(self, message):
+        # Reply to requests for alarm on/off status
+        total = len(self.settings["alarm"])
+        self.bus.emit(message.response(data={"active_alarms": total}))
+
     def on_listen_started(self, message):
         self.log.info("on started...")
         self.is_currently_listening = True
