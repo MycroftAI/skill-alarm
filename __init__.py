@@ -179,6 +179,14 @@ class AlarmSkill(MycroftSkill):
         self.add_event('recognizer_loop:record_begin', self.on_listen_started)
         self.add_event('recognizer_loop:record_end', self.on_listen_ended)
 
+        # Support query for active alarms from other skills
+        self.add_event('private.mycroftai.has_alarm', self.on_has_alarm)
+
+    def on_has_alarm(self, message):
+        # Reply to requests for alarm on/off status
+        total = len(self.settings["alarm"])
+        self.bus.emit(message.response(data={"active_alarms": total}))
+
     def on_listen_started(self, message):
         self.log.info("on started...")
         self.is_currently_listening = True
@@ -270,20 +278,24 @@ class AlarmSkill(MycroftSkill):
 
         return [to_utc(next).timestamp(), alarm[1]]
 
-    def _create_recurring_alarm(self, when, repeat):
-        # 'repeat' is one of the values in the self.recurrence_dict
+    def _create_recurring_alarm(self, when, recur):
+        # 'recur' is a set of day index strings, e.g. {"3", "4"}
         # convert rule into an iCal rrule
         # TODO: Support more complex alarms, e.g. first monday, monthly, etc
-        reps = self.recurrence_dict[repeat].split()
         rule = ""
         abbr = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"]
         days = []
-        for day in reps:
+        for day in recur:
             days.append(abbr[int(day)])
         if days:
             rule = "FREQ=WEEKLY;INTERVAL=1;BYDAY=" + ",".join(days)
 
-        return [to_utc(when).timestamp(), rule]
+        alarm = [to_utc(when).timestamp(), rule]
+        now_ts = to_utc(now_utc()).timestamp()
+        if alarm[0] <= now_ts:
+            return self._next_repeat(alarm)
+        else:
+            return alarm
 
     def has_expired_alarm(self):
         # True is an alarm should be 'going off' now.  Snoozed alarms don't
@@ -304,26 +316,55 @@ class AlarmSkill(MycroftSkill):
     def handle_wake_me(self, message):
         self.handle_set_alarm(message)
 
+    def _create_day_set(self, phrase):
+        recur = set()
+        for r in self.recurrence_dict:
+            if r in phrase:
+                for day in self.recurrence_dict[r].split():
+                    recur.add(day)
+        return recur
+
+    def _recur_desc(self, recur):
+        # Create a textual description of the recur set
+        days = " ".join(recur)
+        for r in self.recurrence_dict:
+            if self.recurrence_dict[r] == days:
+                return r  # accept the first perfect match
+
+        # Assemble a long desc, e.g. "Monday and Wednesday"
+        day_names = []
+        for day in days.split(" "):
+            for r in self.recurrence_dict:
+                if self.recurrence_dict[r] is day:
+                    day_names.append(r)
+                    break
+
+        # TODO:19.02 - switch to translatable. mycroft.util.format.join(day_names, "and")
+        return ", ".join(day_names[:-1]) + " and " + day_names[-1]
+
     # Set an alarm for ...
     @intent_handler(IntentBuilder("").require("Set").require("Alarm").
                     optionally("Recurring").optionally("Recurrence"))
     def handle_set_alarm(self, message):
         utt = message.data.get('utterance').lower()
-        recurrence = None
+        recur = None
 
         if message.data.get('Recurring'):
-            recurrence = message.data.get('Recurrence')
-            if not recurrence:
-                # a bug in Adapt is missing the recurrence.voc.  Look ourselves
-                for r in self.recurrence_dict:
-                    if r in utt:
-                        recurrence = r
+            # Just ignoring the 'Recurrence' now, we support more complex stuff
+            # recurrence = message.data.get('Recurrence')
+            recur = self._create_day_set(utt)
+            # TODO: remove days after "except" clauses
 
-            while recurrence not in self.recurrence_dict:
+            while not recur:
                 r = self.get_response('query.recurrence', num_retries=1)
                 if not r:
                     return
-                recurrence = r
+                recur = self._create_day_set(r)
+
+            if self.voc_match(utt, "Except"):
+                # TODO: Support exceptions
+                self.speak_dialog("no.exceptions.yet")
+                return
 
         # Get the time
         when = extract_datetime(utt)
@@ -339,11 +380,11 @@ class AlarmSkill(MycroftSkill):
         alarm_time = when[0]
         confirmed_time = False
         while not when or when[0] == now[0]:
-            if recurrence:
+            if recur:
                 t = nice_time(alarm_time, use_ampm=True)
                 conf = self.ask_yesno('confirm.recurring.alarm',
                                       data={'time': t,
-                                            'recurrence': recurrence})
+                                            'recurrence': self._recur_desc(recur)})
             else:
                 t = nice_date_time(alarm_time, now=now[0], use_ampm=True)
                 conf = self.ask_yesno('confirm.alarm', data={'time': t})
@@ -361,10 +402,23 @@ class AlarmSkill(MycroftSkill):
                 alarm_time = when[0]
                 when = None  # reverify
 
-        if not recurrence:
+        if not recur:
             alarm = self.set_alarm(alarm_time)
         else:
-            alarm = self.set_alarm(alarm_time, repeat=recurrence)
+            # TODO/BUG: If someone just does "set recurring alarm", the system
+            # asks independently for days and then for time.  The time is
+            # likely on a day that is future but different from the
+            # recurrance days.
+            #
+            # The problem resolves after the first alarm runs, it reschedules
+            # correctly.  But detecting and/or fixing this is tricky.
+            # Future bug fixers -- don't just subtrack 24 hours from the
+            # alarm_time expecting that to fix things.  If you do that the
+            # day after daylight savings time you will be strangely setting
+            # alarms for one hour off.
+            #
+            # I don't have a great solution for this problem yet.  :-/
+            alarm = self.set_alarm(alarm_time, repeat=recur)
 
         if not alarm:
             # none set, it was a duplicate
@@ -377,7 +431,7 @@ class AlarmSkill(MycroftSkill):
         else:
             t = self._describe(alarm)
             reltime = nice_relative_time(self.get_alarm_local(alarm))
-            if recurrence:
+            if recur:
                 self.speak_dialog("recurring.alarm.scheduled.for.time",
                                   data={"time": t, "rel": reltime})
             else:
@@ -484,24 +538,10 @@ class AlarmSkill(MycroftSkill):
                         replace("TU", "2").replace("WE", "3").
                         replace("TH", "4").replace("FR", "5").
                         replace("SA", "6").replace(",", " "))  # now "0 3"
-
-                desc = None
-                for r in self.recurrence_dict:
-                    if self.recurrence_dict[r] == days:
-                        desc = r
-                        break    # accept the first match
-
-                # Assemble a long desc, e.g. "Monday and wednesday"
-                if not desc:
-                    day_names = []
-                    for day in days.split(" "):
-                        for r in self.recurrence_dict:
-                            if self.recurrence_dict[r] is day:
-                                day_names.append(r)
-                                break
-
-                    # TODO:19.02 - switch to translatable. mycroft.util.format.join(day_names, "and")
-                    desc = ", ".join(day_names[:-1]) + " and " + day_names[-1]
+                recur = set()
+                for day in days.split():
+                    recur.add(day)
+                desc = self._recur_desc(recur)
             else:
                 desc = "repeats"
 
