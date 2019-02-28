@@ -3,5 +3,5 @@
     "intent_type": "delete.intent",
     "expected_dialog": "ask.which.alarm.delete",
     "responses": ["first"],
-    "expected_dialog": "alarm.cancelled.recurring"
+    "expected_dialog": "alarm.cancelled"
 }
