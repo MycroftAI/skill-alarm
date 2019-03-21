@@ -50,7 +50,7 @@ except:
         else:
             return dt.replace(tzinfo=gettz("UTC")).astimezone(tz)
 
-# WORKING:
+# WORKING PHRASES/SEQUENCES:
 # Set an alarm
 #    for 9
 #    no for 9 am
@@ -66,20 +66,19 @@ except:
 # snooze for 15 minutes
 # set an alarm for 20 seconds from now
 # Set an alarm every monday at 7
-# #
-# TODO:
 # "Set a recurring alarm for mondays and wednesdays at 7"
-# "Set an alarm for 10 am every weekday  - Adapt is missing "every""
+# "Set an alarm for 10 am every weekday"
 # TODO: Context - save the alarm found in queries as context
 #   When is the next alarm
 #   >  7pm tomorrow
 #   Cancel it
-# TODO:
-#   Interact with date/time to show a dot in the upper-right corner when alarm
-#   is set.  Define a custom messagebus message
 
 
 class AlarmSkill(MycroftSkill):
+
+    beep_gap = 15       # seconds between end of a beep and the start of next
+                        # must be bigger than the max listening time (10 sec)
+    default_sound = "constant_beep"
 
     def __init__(self):
         super(AlarmSkill, self).__init__()
@@ -93,15 +92,16 @@ class AlarmSkill(MycroftSkill):
         # settingmeta.json, which also corresponds to the name of an mp3
         # file in the skill's sounds/ folder.  E.g. <skill>/sounds/bell.mp3
         #
-        self.sound_interval = {
-            "bell": 9.07,
-            "escalate": 40.0,
-            "constant_beep": 10.0,
-            "beep4": 7.0,
-            "chimes": 30.0
+        self.sounds = {
+            "bell":          5.0,
+            "escalate":      32.0,
+            "constant_beep": 5.0,
+            "beep4":         4.0,
+            "chimes":        22.0
         }
+
         # default sound is 'constant_beep'
-        self.settings['sound'] = 'constant_beep'
+        self.settings['sound'] = AlarmSkill.default_sound
         self.settings['start_quiet'] = True
         try:
             self.mixer = Mixer()
@@ -326,7 +326,9 @@ class AlarmSkill(MycroftSkill):
 
     def _recur_desc(self, recur):
         # Create a textual description of the recur set
-        days = " ".join(recur)
+        day_list = list(recur)
+        day_list.sort()
+        days = " ".join(day_list)
         for r in self.recurrence_dict:
             if self.recurrence_dict[r] == days:
                 return r  # accept the first perfect match
@@ -353,7 +355,7 @@ class AlarmSkill(MycroftSkill):
             # Just ignoring the 'Recurrence' now, we support more complex stuff
             # recurrence = message.data.get('Recurrence')
             recur = self._create_day_set(utt)
-            # TODO: remove days after "except" clauses
+            # TODO: remove days following an "except" in the utt
 
             while not recur:
                 r = self.get_response('query.recurrence', num_retries=1)
@@ -445,8 +447,8 @@ class AlarmSkill(MycroftSkill):
     def use_24hour(self):
         return self.config_core.get('time_format') == 'full'
 
-    def _flash_alarm(self, message):
-        # draw on the display
+    def _while_beeping(self, message):
+        # Flash time on the display
         if self.flash_state < 3:
             if self.flash_state == 0:
                 alarm_timestamp = message.data["alarm_time"]
@@ -457,10 +459,14 @@ class AlarmSkill(MycroftSkill):
             self.enclosure.mouth_reset()
             self.flash_state = 0
 
-        # Listen for cries of "Stop!!!"
+        # Listen for cries of "Stop!!!" between beeps (or over beeps for long
+        # audio, which is generally quieter)
         if not self.is_listening():
-            self.log.info("Auto listen...")
-            self.bus.emit(Message('mycroft.mic.listen'))
+            still_beeping = self.beep_process and self.beep_process.poll() == None
+            beep_duration = self.sounds[self.sound_name]
+            if not still_beeping or beep_duration > 10:
+                self.log.info("Auto listen...")
+                self.bus.emit(Message('mycroft.mic.listen'))
 
     def _show_alarm_anim(self, dt):
         # Animated confirmation of the alarm
@@ -717,16 +723,10 @@ class AlarmSkill(MycroftSkill):
             self.speak_dialog("alarm.not.found")
 
     def _alarm_expired(self):
-        # Find user-selected alarm sound
-        alarm_file = join(abspath(dirname(__file__)),
-                          'sounds', self.settings["sound"] + ".mp3")
-        if os.path.isfile(alarm_file):
-            self.sound_file = alarm_file
-            self.sound_repeat = self.sound_interval[self.settings["sound"]]
-        else:
-            self.sound_file = join(abspath(dirname(__file__)),
-                                   'sounds', "constant_beep.mp3")
-            self.sound_repeat = self.sound_interval["constant_beep"]
+        self.sound_name = self.settings["sound"]  # user-selected alarm sound
+        if not self.sound_name or self.sound_name not in self.sounds:
+            # invalid sound name, use the default
+            self.sound_name = AlarmSkill.default_sound
 
         if self.settings['start_quiet'] and self.mixer:
             if not self.saved_volume:  # don't overwrite if already saved!
@@ -738,10 +738,11 @@ class AlarmSkill(MycroftSkill):
         self._disable_listen_beep()
         self._play_beep()
 
+        # Once a second Flash the alarm and auto-listen
         self.flash_state = 0
         self.enclosure.deactivate_mouth_events()
         alarm = self.settings["alarm"][0]
-        self.schedule_repeating_event(self._flash_alarm, 0, 1,
+        self.schedule_repeating_event(self._while_beeping, 0, 1,
                                       name='Flash',
                                       data={"alarm_time": alarm[0]})
 
@@ -749,7 +750,11 @@ class AlarmSkill(MycroftSkill):
         self.cancel_scheduled_event('Beep')
         self.beep_start_time = None
         if self.beep_process:
-            self.beep_process.kill()
+            try:
+                if self.beep_process.poll() == None:    # still running
+                    self.beep_process.kill()
+            except:
+                pass
             self.beep_process = None
         self._restore_volume()
         self._restore_listen_beep()
@@ -858,11 +863,28 @@ class AlarmSkill(MycroftSkill):
             self._stop_expired_alarm()
             return
 
-        next_beep = now + timedelta(seconds=(self.sound_repeat))
+        # Validate user-selected alarm sound file
+        alarm_file = join(abspath(dirname(__file__)),
+                          'sounds', self.sound_name + ".mp3")
+        if not os.path.isfile(alarm_file):
+            # Couldn't find the required sound file
+            self.sound_name = AlarmSkill.default_sound
+            alarm_file = join(abspath(dirname(__file__)),
+                            'sounds', self.sound_name + ".mp3")
+
+        beep_duration = self.sounds[self.sound_name]
+        repeat_interval = beep_duration + AlarmSkill.beep_gap
+
+        next_beep = now + timedelta(seconds=repeat_interval)
+        end_of_beep = now + timedelta(seconds=(beep_duration+1))
+
         self.cancel_scheduled_event('Beep')
         self.schedule_event(self._play_beep, to_system(next_beep), name='Beep')
-        if self.beep_process:
-            self.beep_process.kill()
+        try:
+            if self.beep_process and self.beep_process.poll() == None:
+                self.beep_process.kill()
+        except:
+            self.beep_process = None
 
         # Increase volume each pass until fully on
         if self.saved_volume:
@@ -870,7 +892,10 @@ class AlarmSkill(MycroftSkill):
                 self.volume += 10
             self.mixer.setvolume(self.volume)
 
-        self.beep_process = play_mp3(self.sound_file)
+        try:
+            self.beep_process = play_mp3(alarm_file)
+        except:
+            self.beep_process = None
 
     def stop(self):
         return self._stop_expired_alarm()

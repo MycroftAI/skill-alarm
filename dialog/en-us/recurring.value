@@ -16,9 +16,21 @@ sundays,0
 sunday,0
 weekdays,1 2 3 4 5
 weekday,1 2 3 4 5
+every weekday, 1 2 3 4 5
+each weekday, 1 2 3 4 5
 weekends,0 6
 weekend,0 6
 every day,0 1 2 3 4 5 6
+each day,0 1 2 3 4 5 6
 everyday,0 1 2 3 4 5 6
+every morning,0 1 2 3 4 5 6
+every afternoon,0 1 2 3 4 5 6
+every evening,0 1 2 3 4 5 6
+every night,0 1 2 3 4 5 6
+each morning,0 1 2 3 4 5 6
+each afternoon,0 1 2 3 4 5 6
+each evening,0 1 2 3 4 5 6
+each night,0 1 2 3 4 5 6
 daily,0 1 2 3 4 5 6
+work days,1 2 3 4 5
 work,1 2 3 4 5
