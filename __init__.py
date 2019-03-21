@@ -290,12 +290,17 @@ class AlarmSkill(MycroftSkill):
         if days:
             rule = "FREQ=WEEKLY;INTERVAL=1;BYDAY=" + ",".join(days)
 
-        alarm = [to_utc(when).timestamp(), rule]
-        now_ts = to_utc(now_utc()).timestamp()
-        if alarm[0] <= now_ts:
-            return self._next_repeat(alarm)
-        else:
-            return alarm
+        when = to_utc(when)
+        alarm = [when.timestamp(), rule]
+
+        # Create a repeating rule that starts in the past, enough days
+        # back that it encompasses any repeat.
+        past = when + timedelta(days=-45)
+        rr = rrulestr("RRULE:" + alarm[1], dtstart=past)
+        now = to_utc(now_utc())
+        # Get the first repeat that happens after right now
+        next = rr.after(now)
+        return [to_utc(next).timestamp(), alarm[1]]
 
     def has_expired_alarm(self):
         # True is an alarm should be 'going off' now.  Snoozed alarms don't
@@ -341,8 +346,7 @@ class AlarmSkill(MycroftSkill):
                     day_names.append(r)
                     break
 
-        # TODO:19.02 - switch to translatable. mycroft.util.format.join(day_names, "and")
-        return ", ".join(day_names[:-1]) + " and " + day_names[-1]
+        return mycroft.util.format.join(day_names, "and")
 
     # Set an alarm for ...
     @intent_handler(IntentBuilder("").require("Set").require("Alarm").
@@ -407,19 +411,6 @@ class AlarmSkill(MycroftSkill):
         if not recur:
             alarm = self.set_alarm(alarm_time)
         else:
-            # TODO/BUG: If someone just does "set recurring alarm", the system
-            # asks independently for days and then for time.  The time is
-            # likely on a day that is future but different from the
-            # recurrance days.
-            #
-            # The problem resolves after the first alarm runs, it reschedules
-            # correctly.  But detecting and/or fixing this is tricky.
-            # Future bug fixers -- don't just subtrack 24 hours from the
-            # alarm_time expecting that to fix things.  If you do that the
-            # day after daylight savings time you will be strangely setting
-            # alarms for one hour off.
-            #
-            # I don't have a great solution for this problem yet.  :-/
             alarm = self.set_alarm(alarm_time, repeat=recur)
 
         if not alarm:
@@ -908,19 +899,22 @@ def create_skill():
 ##########################################################################
 # TODO: Move to mycroft.util.format and support translation
 
-def nice_relative_time(when, lang="en-us"):
+def nice_relative_time(when, relative_to=None, lang=None):
     """ Create a relative phrase to roughly describe a datetime
 
     Examples are "25 seconds", "tomorrow", "7 days".
 
     Args:
         when (datetime): Local timezone
+        relative_to (datetime): Baseline for relative time, default is now()
         lang (str, optional): Defaults to "en-us".
-        speech (bool, optional): Defaults to True.
     Returns:
-        str: description of the given time
+        str: Relative description of the given time
     """
-    now = now_local()
+    if relative_to:
+        now = relative_to
+    else:
+        now = now_local()
     delta = (to_local(when) - now)
 
     if delta.total_seconds() < 1:
