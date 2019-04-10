@@ -1,2 +1,3 @@
-(entferne|lösche) (meinen|den|) {time} (alarm|wecker|).
-(entferne|lösche) (mein|meinen | den|) (alarm|wecker) ( um | für) {time}.
+(lösche|entferne|deaktiviere|stoppe) (meine|die) (Alarme|Wecker)
+(lösche|entferne|deaktiviere|breche|stoppe|schalte) (den|meinen|) {time} Alarm (ab|aus|)
+(lösche|entferne|deaktiviere|breche|stoppe|schalte) (den|meinen|) Alarm (um|für) {time} (ab|aus|)
