@@ -408,8 +408,21 @@ class AlarmSkill(MycroftSkill):
                 alarm_time = when[0]
                 when = None  # reverify
 
+        alarm = None
         if not recur:
-            alarm = self.set_alarm(alarm_time)
+            alarm_time_ts = to_utc(alarm_time).timestamp()
+            now_ts = now_utc().timestamp()
+            if alarm_time_ts > now_ts:
+                alarm = self.set_alarm(alarm_time)
+            else:
+                if ('today' in utt) or ('tonight' in utt):
+                    self.speak_dialog('alarm.past')
+                    return
+                else:
+                    # Set the alarm on next weekday
+                    alarm_time_ts += 7 * 86400.0
+                    alarm_time = datetime.utcfromtimestamp(alarm_time_ts)
+                    alarm = self.set_alarm(alarm_time)
         else:
             alarm = self.set_alarm(alarm_time, repeat=recur)
 
