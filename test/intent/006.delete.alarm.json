@@ -1,5 +1,6 @@
 {
     "utterance": "delete the alarm for wednesday at 7 in the morning",
     "intent_type": "delete.intent",
-    "expected_dialog": "alarm.cancelled.desc"
+    "responses": ["yes"],
+    "expected_dialog": ["alarm.cancelled", "alarm.cancelled.desc"]
 }
