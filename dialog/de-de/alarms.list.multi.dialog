@@ -1,1 +1,1 @@
-Du hast {{count}} Alarme: {{item}} und {{itemAnd}}
+Du hast {{count}} (Alarm|Wecker): {{item}} und {{itemAnd}}
