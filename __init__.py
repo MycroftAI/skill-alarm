@@ -79,6 +79,8 @@ class AlarmSkill(MycroftSkill):
     beep_gap = 15       # seconds between end of a beep and the start of next
                         # must be bigger than the max listening time (10 sec)
     default_sound = "constant_beep"
+    
+    start_quiet_cache = True
 
     def __init__(self):
         super(AlarmSkill, self).__init__()
@@ -304,7 +306,7 @@ class AlarmSkill(MycroftSkill):
 
     def has_expired_alarm(self):
         # True is an alarm should be 'going off' now.  Snoozed alarms don't
-        # count until the are triggered again.
+        # count until they are triggered again.
         if not self.settings["alarm"]:
             return False
 
@@ -765,14 +767,16 @@ class AlarmSkill(MycroftSkill):
         if not self.sound_name or self.sound_name not in self.sounds:
             # invalid sound name, use the default
             self.sound_name = AlarmSkill.default_sound
+            
+        self.start_quiet_cache = self.settings['start_quiet']
 
-        if self.settings['start_quiet'] and self.mixer:
+        if self.mixer:
             if not self.saved_volume:  # don't overwrite if already saved!
                 self.saved_volume = self.mixer.getvolume()
-                self.volume = 0    # increase by 10% each pass
+                self.volume = 0    # increase by 20% each pass
         else:
             self.saved_volume = None
-
+        
         self._disable_listen_beep()
         self._play_beep()
 
@@ -840,7 +844,8 @@ class AlarmSkill(MycroftSkill):
             new_conf_values = {"confirm_listening": False}
             user_config = LocalConf(USER_CONFIG)
 
-            if self.settings["user_beep_setting"] is None:
+            if self.settings["user_beep_setting"] is None and \
+                            "confirm_listening" in user_config:
                 del user_config["confirm_listening"]
             else:
                 user_config.merge({"confirm_listening":
@@ -925,10 +930,14 @@ class AlarmSkill(MycroftSkill):
             self.beep_process = None
 
         # Increase volume each pass until fully on
-        if self.saved_volume:
+        if self.start_quiet_cache:
             if self.volume < 90:
-                self.volume += 10
+                self.volume += 20
             self.mixer.setvolume(self.volume)
+            
+        else:
+            if self.saved_volume[0] < 90:
+                self.mixer.setvolume(self.saved_volume[0] + 20)
 
         try:
             self.beep_process = play_mp3(alarm_file)
