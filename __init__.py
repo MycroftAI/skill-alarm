@@ -75,9 +75,35 @@ except:
 
 
 class AlarmSkill(MycroftSkill):
+                
+    #####################################################################
+    # TODO: To remove if this property is present on the MycroftSkill
+    # superclass
+    
+    @property
+    def platform(self):
+        """ Get the platform identifier string
 
-    beep_gap = 15       # seconds between end of a beep and the start of next
-                        # must be bigger than the max listening time (10 sec)
+        Returns:
+            str: Platform identifier, such as "mycroft_mark_1",
+                 "mycroft_picroft", "mycroft_mark_2".  None for nonstandard.
+        """
+        if self.config_core and self.config_core.get("enclosure"):
+            return self.config_core["enclosure"].get("platform")
+        else:
+            return None
+    ######################################################################
+    
+    # For Mark 1 and Picroft, seconds between end of a beep and the start
+    # of next must be bigger than the max listening time (10 sec). Else,
+    # we can enable listening while the beep is playing with minimal pause.
+    
+    if (platform == 'mycroft_mark_1' or \
+        platform == 'mycroft_picroft'):
+        beep_gap = 15
+    else:
+        beep_gap = 1
+        
     default_sound = "constant_beep"
     
     start_quiet_cache = False
@@ -778,15 +804,18 @@ class AlarmSkill(MycroftSkill):
             self.saved_volume = None
         
         self._disable_listen_beep()
+        
         self._play_beep()
-
+        
         # Once a second Flash the alarm and auto-listen
-        self.flash_state = 0
-        self.enclosure.deactivate_mouth_events()
-        alarm = self.settings["alarm"][0]
-        self.schedule_repeating_event(self._while_beeping, 0, 1,
-                                      name='Flash',
-                                      data={"alarm_time": alarm[0]})
+        if (self.platform == 'mycroft_mark_1' or \
+            self.platform == 'mycroft_picroft'):
+            self.flash_state = 0
+            self.enclosure.deactivate_mouth_events()
+            alarm = self.settings["alarm"][0]
+            self.schedule_repeating_event(self._while_beeping, 0, 1,
+                                        name='Flash',
+                                        data={"alarm_time": alarm[0]})
 
     def __end_beep(self):
         self.cancel_scheduled_event('Beep')
@@ -895,6 +924,16 @@ class AlarmSkill(MycroftSkill):
         self._schedule()
 
     def _play_beep(self, message=None):
+                
+        """ For Mark 2 and other platforms, enable listening """
+        if (self.platform == None or \
+            self.platform == 'mycroft_mark_2') and \
+            not self.is_listening():
+            self.bus.emit(Message('mycroft.mic.listen'))
+            self.log.info(f'_play_beep: Listening')
+            while self.is_listening():
+                continue
+            
         """ Play alarm sound file """
         now = now_local()
 
