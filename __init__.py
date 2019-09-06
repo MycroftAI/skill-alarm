@@ -80,7 +80,7 @@ class AlarmSkill(MycroftSkill):
                         # must be bigger than the max listening time (10 sec)
     default_sound = "constant_beep"
     
-    start_quiet_cache = True
+    start_quiet_cache = False
 
     def __init__(self):
         super(AlarmSkill, self).__init__()
@@ -773,7 +773,7 @@ class AlarmSkill(MycroftSkill):
         if self.mixer:
             if not self.saved_volume:  # don't overwrite if already saved!
                 self.saved_volume = self.mixer.getvolume()
-                self.volume = 0    # increase by 20% each pass
+                self.volume = 0    # increase by 10% each pass
         else:
             self.saved_volume = None
         
@@ -932,7 +932,7 @@ class AlarmSkill(MycroftSkill):
         # Increase volume each pass until fully on
         if self.start_quiet_cache:
             if self.volume < 90:
-                self.volume += 20
+                self.volume += 10
             self.mixer.setvolume(self.volume)
             
         else:
