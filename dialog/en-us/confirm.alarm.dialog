@@ -1,2 +1,2 @@
-I'm setting an alarm for {{time}}, does that sound right?
-I'm creating a new alarm for {{time}}, correct?
+I'm (setting|creating) an alarm for {{time}}, does that sound right?
+I'm (setting|creating) a new alarm for {{time}}, correct?

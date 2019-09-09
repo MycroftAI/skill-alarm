@@ -1,2 +1,2 @@
-Your next alarm is {when}, {duration} from now
-The next alarm is for {when}, {duration} from now
+(Your|The) next alarm is {when}, {duration} from now
+(Your|The) next alarm is for {when}, {duration} from now

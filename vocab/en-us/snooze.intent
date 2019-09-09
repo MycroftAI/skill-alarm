@@ -1,4 +1,9 @@
 snooze
-snooze alarm
-snooze alarm for {{time}} (minutes|hours)
-pause alarm
+snooze (the|) alarm
+snooze (the|) alarm for {{time}} (minutes|hours)
+snooze for {{time}} (minutes|hours)
+pause (the|) alarm
+not yet
+give me {{time}} more (minutes|hours)
+wake me up in {{time}} (minutes|hours)
+let me sleep

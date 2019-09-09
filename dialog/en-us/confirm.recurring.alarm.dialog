@@ -1,2 +1,2 @@
-I'm setting a recurring alarm for {{time}} on {{recurrence}}, does that sound right?
-I'm creating a new recurring alarm for {{time}} on {{recurrence}}, correct?
+I'm (setting|creating) a recurring alarm for {{time}} on {{recurrence}}, does that sound right?
+I'm (setting|creating) a new recurring alarm for {{time}} on {{recurrence}}, correct?

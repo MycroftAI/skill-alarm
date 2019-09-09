@@ -24,7 +24,7 @@ from mycroft.audio import wait_while_speaking
 from mycroft.configuration.config import LocalConf, USER_CONFIG
 from mycroft.messagebus.message import Message
 from mycroft.util import play_wav, play_mp3
-from mycroft.util.format import nice_date_time, nice_time, nice_date
+from mycroft.util.format import nice_date_time, nice_time, nice_date, join_list
 from mycroft.util.log import LOG
 from mycroft.util.parse import fuzzy_match, extract_datetime, extract_number
 from dateutil.parser import parse
@@ -75,34 +75,9 @@ except:
 
 
 class AlarmSkill(MycroftSkill):
-                
-    #####################################################################
-    # TODO: To remove if this property is present on the MycroftSkill
-    # superclass
     
-    @property
-    def platform(self):
-        """ Get the platform identifier string
-
-        Returns:
-            str: Platform identifier, such as "mycroft_mark_1",
-                 "mycroft_picroft", "mycroft_mark_2".  None for nonstandard.
-        """
-        if self.config_core and self.config_core.get("enclosure"):
-            return self.config_core["enclosure"].get("platform")
-        else:
-            return None
-    ######################################################################
-    
-    # For Mark 1 and Picroft, seconds between end of a beep and the start
-    # of next must be bigger than the max listening time (10 sec). Else,
-    # we can enable listening while the beep is playing with minimal pause.
-    
-    if (platform == 'mycroft_mark_1' or \
-        platform == 'mycroft_picroft'):
-        beep_gap = 15
-    else:
-        beep_gap = 1
+    beep_gap = 15       # seconds between end of a beep and the start of next
+                        # must be bigger than the max listening time (10 sec)
         
     default_sound = "constant_beep"
 
@@ -189,6 +164,7 @@ class AlarmSkill(MycroftSkill):
 
     def initialize(self):
         self.register_entity_file('daytype.entity')  # TODO: Keep?
+        self.register_entity_file('and.entity')
         self.recurrence_dict = self.translate_namedvalues('recurring')
 
         # Time is the first value, so this will sort alarms by time
@@ -372,10 +348,10 @@ class AlarmSkill(MycroftSkill):
                     day_names.append(r)
                     break
 
-        return mycroft.util.format.join(day_names, "and")
+        return join_list(day_names, self.translate('and'))
 
     # Set an alarm for ...
-    @intent_handler(IntentBuilder("").require("Set").require("Alarm").
+    @intent_handler(IntentBuilder("").optionally("Set").require("Alarm").
                     optionally("Recurring").optionally("Recurrence"))
     def handle_set_alarm(self, message):
         utt = message.data.get('utterance').lower()
@@ -614,16 +590,20 @@ class AlarmSkill(MycroftSkill):
             desc.append(self._describe(alarm))
             if len(desc) > 3:
                 break
+        
+        items_string = ''
+        if desc:    
+            items_string = join_list(desc, self.translate('and'))
 
         if total == 1:
             self.speak_dialog("alarms.list.single", data={'item': desc[0]})
         else:
             self.speak_dialog("alarms.list.multi",
                               data={'count': total,
-                                    'item': ", ".join(desc[:-1]),
-                                    'itemAnd': desc[-1]})
+                                    'items': items_string})
 
-    @intent_file_handler('delete.all.intent')
+    @intent_handler(IntentBuilder("").require("Delete").require("All").
+                    require("Alarm"))
     def handle_delete_all(self, message):
         total = len(self.settings["alarm"])
         if not total:
@@ -720,15 +700,15 @@ class AlarmSkill(MycroftSkill):
             # If no alarm is present check the remaining cases if any
             return False
 
-    @intent_file_handler('delete.intent')
+    #@intent_file_handler('delete.intent')
+    @intent_handler(IntentBuilder("").require("Delete").require("Alarm"))
     def handle_delete(self, message):
         total = len(self.settings["alarm"])
         if not total:
             self.speak_dialog("alarms.list.empty")
             return
 
-        utt = message.data.get('utterance') or ""
-        time = message.data.get('time') or ""
+        utt = message.data.get("utterance") or ""
 
         # First see if the user spoke a date/time in the delete request
         when = extract_datetime(utt)
@@ -804,14 +784,12 @@ class AlarmSkill(MycroftSkill):
         self._play_beep()
         
         # Once a second Flash the alarm and auto-listen
-        if (self.platform == 'mycroft_mark_1' or \
-            self.platform == 'mycroft_picroft'):
-            self.flash_state = 0
-            self.enclosure.deactivate_mouth_events()
-            alarm = self.settings["alarm"][0]
-            self.schedule_repeating_event(self._while_beeping, 0, 1,
-                                        name='Flash',
-                                        data={"alarm_time": alarm[0]})
+        self.flash_state = 0
+        self.enclosure.deactivate_mouth_events()
+        alarm = self.settings["alarm"][0]
+        self.schedule_repeating_event(self._while_beeping, 0, 1,
+                                    name='Flash',
+                                    data={"alarm_time": alarm[0]})
 
     def __end_beep(self):
         self.cancel_scheduled_event('Beep')
@@ -869,7 +847,8 @@ class AlarmSkill(MycroftSkill):
             new_conf_values = {"confirm_listening": False}
             user_config = LocalConf(USER_CONFIG)
 
-            if self.settings["user_beep_setting"] is None:
+            if self.settings["user_beep_setting"] is None and\
+               "confirm_listening" in user_config:
                 del user_config["confirm_listening"]
             else:
                 user_config.merge({"confirm_listening":
@@ -919,16 +898,6 @@ class AlarmSkill(MycroftSkill):
         self._schedule()
 
     def _play_beep(self, message=None):
-                
-        """ For Mark 2 and other platforms, enable listening """
-        if (self.platform == None or \
-            self.platform == 'mycroft_mark_2') and \
-            not self.is_listening():
-            self.bus.emit(Message('mycroft.mic.listen'))
-            self.log.info(f'_play_beep: Listening')
-            while self.is_listening():
-                continue
-            
         """ Play alarm sound file """
         now = now_local()
 
