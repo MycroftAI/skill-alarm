@@ -847,8 +847,8 @@ class AlarmSkill(MycroftSkill):
             new_conf_values = {"confirm_listening": False}
             user_config = LocalConf(USER_CONFIG)
 
-            if self.settings["user_beep_setting"] is None and\
-               "confirm_listening" in user_config:
+            if self.settings["user_beep_setting"] is None and \
+                            "confirm_listening" in user_config:
                 del user_config["confirm_listening"]
             else:
                 user_config.merge({"confirm_listening":
