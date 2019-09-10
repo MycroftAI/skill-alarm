@@ -945,7 +945,11 @@ class AlarmSkill(MycroftSkill):
 
     def stop(self):
         return self._stop_expired_alarm()
-
+    
+    @intent_file_handler('change.alarm.sound.intent')
+    def handle_change_alarm(self, message):
+        self.speak_dialog("alarm.change.sound")
+        
 
 def create_skill():
     return AlarmSkill()
