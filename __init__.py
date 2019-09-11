@@ -80,6 +80,7 @@ class AlarmSkill(MycroftSkill):
                         # must be bigger than the max listening time (10 sec)
         
     default_sound = "constant_beep"
+    threshold = 0.7     # Threshold for word fuzzy matching
 
     def __init__(self):
         super(AlarmSkill, self).__init__()
@@ -377,17 +378,49 @@ class AlarmSkill(MycroftSkill):
         # Get the time
         when = extract_datetime(utt)
         now = extract_datetime("dummy")  # Will return dt of unmatched string
-        while not when or when[0] == now[0]:
+        
+        # Check the time if it's midnight. This is to check if the user
+        # said a recurring alarm with only the Day or if the user did 
+        # specify to set an alarm on midnight. If it's confirmed that 
+        # it's for a day only, then get another response from the user 
+        # to clarify what time on that day the recurring alarm is.
+        is_midnight = self._check_if_utt_has_midnight(utt,
+                                                      when[0],
+                                                      self.threshold)
+        
+        while when[0].time() == now[0].time() and not is_midnight:
+            r = self.get_response('query.for.when', num_retries=1)
+            if not r:
+                return
+            when_temp = extract_datetime(r)
+            
+            is_midnight = self._check_if_utt_has_midnight(r,
+                                                          when_temp[0],
+                                                          self.threshold)
+            when[0] = datetime(tzinfo = when[0].tzinfo,
+                                year = when[0].year,
+                                month = when[0].month,
+                                day = when[0].day,
+                                hour = when_temp[0].hour,
+                                minute = when_temp[0].minute, 
+                                second = when_temp[0].second)
+        
+        # Check if we already have a valid date and time. If not, get another
+        # response from the user.
+        while (not when or when[0] == now[0]) and not is_midnight:
             # No time given, ask for one
             r = self.get_response('query.for.when', num_retries=1)
             if not r:
                 return
             when = extract_datetime(r)
+            is_midnight = self._check_if_utt_has_midnight(r,
+                                                when[0],
+                                                self.threshold)
 
         # Verify time
         alarm_time = when[0]
         confirmed_time = False
-        while not when or when[0] == now[0]:
+        while (not when or when[0] == now[0]) and not confirmed_time:
             if recur:
                 t = nice_time(alarm_time, use_ampm=True)
                 conf = self.ask_yesno('confirm.recurring.alarm',
@@ -421,8 +454,9 @@ class AlarmSkill(MycroftSkill):
                     self.speak_dialog('alarm.past')
                     return
                 else:
-                    # Set the alarm on next weekday
-                    alarm_time_ts += 7 * 86400.0
+                    # Set the alarm to find the next 12 hour time slot
+                    while alarm_time_ts < now_ts:
+                        alarm_time_ts += (86400.0/2)
                     alarm_time = datetime.utcfromtimestamp(alarm_time_ts)
                     alarm = self.set_alarm(alarm_time)
         else:
@@ -448,6 +482,26 @@ class AlarmSkill(MycroftSkill):
 
         self._show_alarm_anim(alarm_time)
         self.enclosure.activate_mouth_events()
+        
+    def _check_if_utt_has_midnight(self, utt, init_time, threshold):
+        matched = False
+        if init_time.time() == datetime(1970, 1, 1, 0, 0, 0).time():
+            score = 0
+            utt_split = utt.split(' ')\
+            
+            for word in self.translate_list('midnight'):
+                word_split_len = len(word.split(' '))
+                
+                for i in range(len(utt_split) - word_split_len, -1, -1):
+                    utt_comp = ' '.join(utt_split[i:i + word_split_len])
+                    score_curr = fuzzy_match(utt_comp, word.lower())
+                    
+                    if score_curr > score and score_curr >= threshold:
+                        score = score_curr
+                        matched = True
+
+        return matched
+                        
 
     @property
     def use_24hour(self):
