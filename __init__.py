@@ -377,7 +377,12 @@ class AlarmSkill(MycroftSkill):
 
         # Get the time
         when = extract_datetime(utt)
-        now = extract_datetime("dummy")  # Will return dt of unmatched string
+        if not when == None:
+            when = when[0]
+            
+        # Will return dt of unmatched string
+        today = extract_datetime("today")
+        today = today[0]
         
         # Check the time if it's midnight. This is to check if the user
         # said a recurring alarm with only the Day or if the user did 
@@ -385,49 +390,53 @@ class AlarmSkill(MycroftSkill):
         # it's for a day only, then get another response from the user 
         # to clarify what time on that day the recurring alarm is.
         is_midnight = self._check_if_utt_has_midnight(utt,
-                                                      when[0],
+                                                      when,
                                                       self.threshold)
         
-        while when[0].time() == now[0].time() and not is_midnight:
+        while (not when or when.time() == today.time()) and not is_midnight:
             r = self.get_response('query.for.when', num_retries=1)
             if not r:
                 return
             when_temp = extract_datetime(r)
-            
-            is_midnight = self._check_if_utt_has_midnight(r,
-                                                          when_temp[0],
-                                                          self.threshold)
-            when[0] = datetime(tzinfo = when[0].tzinfo,
-                                year = when[0].year,
-                                month = when[0].month,
-                                day = when[0].day,
-                                hour = when_temp[0].hour,
-                                minute = when_temp[0].minute, 
-                                second = when_temp[0].second)
+            if not when_temp == None:
+                when_temp = when_temp[0]
+                is_midnight = self._check_if_utt_has_midnight(r,
+                                                            when_temp,
+                                                            self.threshold)
+                when = datetime(tzinfo = when.tzinfo,
+                                year = when.year,
+                                month = when.month,
+                                day = when.day,
+                                hour = when_temp.hour,
+                                minute = when_temp.minute)
+            else:
+                when = None
         
         # Check if we already have a valid date and time. If not, get another
         # response from the user.
-        while (not when or when[0] == now[0]) and not is_midnight:
+        while (not when or when == today) and not is_midnight:
             # No time given, ask for one
             r = self.get_response('query.for.when', num_retries=1)
             if not r:
                 return
             when = extract_datetime(r)
+            if not when == None:
+                when = when[0]
             is_midnight = self._check_if_utt_has_midnight(r,
-                                                when[0],
-                                                self.threshold)
+                                                          when,
+                                                          self.threshold)
 
         # Verify time
-        alarm_time = when[0]
+        alarm_time = when
         confirmed_time = False
-        while (not when or when[0] == now[0]) and not confirmed_time:
+        while (not when or when == today) and not confirmed_time:
             if recur:
                 t = nice_time(alarm_time, use_ampm=True)
                 conf = self.ask_yesno('confirm.recurring.alarm',
                                       data={'time': t,
                                             'recurrence': self._recur_desc(recur)})
             else:
-                t = nice_date_time(alarm_time, now=now[0], use_ampm=True)
+                t = nice_date_time(alarm_time, now=today, use_ampm=True)
                 conf = self.ask_yesno('confirm.alarm', data={'time': t})
             if not conf:
                 return
@@ -437,10 +446,12 @@ class AlarmSkill(MycroftSkill):
             else:
                 # check if a new (corrected) time was given
                 when = extract_datetime(conf)
-                if not when or when[0] == now[0]:
+                if not when == None:
+                    when = when[0]
+                if not when or when == today:
                     # Not a confirmation and no date/time in statement, quit
                     return
-                alarm_time = when[0]
+                alarm_time = when
                 when = None  # reverify
 
         alarm = None
@@ -454,9 +465,9 @@ class AlarmSkill(MycroftSkill):
                     self.speak_dialog('alarm.past')
                     return
                 else:
-                    # Set the alarm to find the next 12 hour time slot
+                    # Set the alarm to find the next 24 hour time slot
                     while alarm_time_ts < now_ts:
-                        alarm_time_ts += (86400.0/2)
+                        alarm_time_ts += 86400.0
                     alarm_time = datetime.utcfromtimestamp(alarm_time_ts)
                     alarm = self.set_alarm(alarm_time)
         else:
