@@ -17,6 +17,7 @@ from os.path import join, abspath, dirname
 from datetime import datetime, timedelta
 import os.path
 from alsaaudio import Mixer
+import re
 
 from adapt.intent import IntentBuilder
 from mycroft import MycroftSkill, intent_handler, intent_file_handler
@@ -377,8 +378,17 @@ class AlarmSkill(MycroftSkill):
 
         # Get the time
         when = extract_datetime(utt)
+        utt_no_datetime = None
         if not when == None:
+            utt_no_datetime = when[1]
             when = when[0]
+            
+            
+        # Get name from leftover string from extract_datetime
+        if utt_no_datetime:
+            name = self._get_alarm_name(utt_no_datetime)
+        else:
+            name = None
             
         # Will return dt of unmatched string
         today = extract_datetime("today")
@@ -493,6 +503,30 @@ class AlarmSkill(MycroftSkill):
 
         self._show_alarm_anim(alarm_time)
         self.enclosure.activate_mouth_events()
+    
+    def _get_alarm_name(self, utt):
+        """ Get the alarm name using regex on an utterance
+        """
+        self.log.debug("Utterance being searched: " + utt)
+        rx_file = self.find_resource('name.rx', 'regex')
+        if utt and rx_file:
+            with open(rx_file) as f:
+                for pat in f.read().splitlines():
+                    pat = pat.strip()
+                    self.log.debug("Regex pattern: " + pat)
+                    if pat and pat[0] == "#":
+                        continue
+                    res = re.search(pat, utt)
+                    if res:
+                        try:
+                            name = res.group("Name").strip()
+                            self.log.debug('Regex name extracted: '
+                                           + name)
+                            if name and len(name.strip()) > 0:
+                                return name
+                        except IndexError:
+                            pass
+        return None
         
     def _check_if_utt_has_midnight(self, utt, init_time, threshold):
         matched = False
