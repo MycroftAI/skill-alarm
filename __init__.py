@@ -166,7 +166,6 @@ class AlarmSkill(MycroftSkill):
 
     def initialize(self):
         self.register_entity_file('daytype.entity')  # TODO: Keep?
-        self.register_entity_file('and.entity')
         self.recurrence_dict = self.translate_namedvalues('recurring')
 
         # Time is the first value, so this will sort alarms by time
@@ -209,16 +208,20 @@ class AlarmSkill(MycroftSkill):
             ts = alarm[0]
         return datetime.fromtimestamp(ts, default_timezone())
 
-    def set_alarm(self, when, repeat=None):
+    def set_alarm(self, when, name=None, repeat=None):
         if repeat:
             alarm = self._create_recurring_alarm(when, repeat)
         else:
             alarm = [to_utc(when).timestamp(), ""]
+            
+        alarm.append(name)
 
         for existing in self.settings["alarm"]:
             if alarm == existing:
                 self.speak_dialog("alarm.already.exists")
                 return
+            if name and name == existing[2]:
+                self.is_currently_listening
 
         self.settings["alarm"].append(alarm)
         self._schedule()
@@ -469,7 +472,7 @@ class AlarmSkill(MycroftSkill):
             alarm_time_ts = to_utc(alarm_time).timestamp()
             now_ts = now_utc().timestamp()
             if alarm_time_ts > now_ts:
-                alarm = self.set_alarm(alarm_time)
+                alarm = self.set_alarm(alarm_time, name)
             else:
                 if ('today' in utt) or ('tonight' in utt):
                     self.speak_dialog('alarm.past')
@@ -479,14 +482,14 @@ class AlarmSkill(MycroftSkill):
                     while alarm_time_ts < now_ts:
                         alarm_time_ts += 86400.0
                     alarm_time = datetime.utcfromtimestamp(alarm_time_ts)
-                    alarm = self.set_alarm(alarm_time)
+                    alarm = self.set_alarm(alarm_time, name)
         else:
-            alarm = self.set_alarm(alarm_time, repeat=recur)
+            alarm = self.set_alarm(alarm_time, name, repeat=recur)
 
         if not alarm:
             # none set, it was a duplicate
             return
-
+        
         # Don't want to hide the animation
         self.enclosure.deactivate_mouth_events()
         if confirmed_time:
@@ -523,27 +526,20 @@ class AlarmSkill(MycroftSkill):
                             self.log.debug('Regex name extracted: '
                                            + name)
                             if name and len(name.strip()) > 0:
-                                return name
+                                return name.lower()
                         except IndexError:
                             pass
         return None
         
     def _check_if_utt_has_midnight(self, utt, init_time, threshold):
         matched = False
-        if init_time.time() == datetime(1970, 1, 1, 0, 0, 0).time():
-            score = 0
-            utt_split = utt.split(' ')\
-            
+        if init_time.time() == datetime(1970, 1, 1, 0, 0, 0).time():            
             for word in self.translate_list('midnight'):
-                word_split_len = len(word.split(' '))
-                
-                for i in range(len(utt_split) - word_split_len, -1, -1):
-                    utt_comp = ' '.join(utt_split[i:i + word_split_len])
-                    score_curr = fuzzy_match(utt_comp, word.lower())
-                    
-                    if score_curr > score and score_curr >= threshold:
-                        score = score_curr
-                        matched = True
+                matched = self._fuzzy_match_word_from_phrase(
+                    word, utt, threshold
+                )
+                if matched:
+                    return matched
 
         return matched
                         
@@ -654,15 +650,26 @@ class AlarmSkill(MycroftSkill):
                     recur.add(day)
                 desc = self._recur_desc(recur)
             else:
-                desc = "repeats"
+                desc = self.translate('repeats')
 
             dt = self.get_alarm_local(alarm)
-            return self.translate('recurring.alarm',
+            
+            dialog = 'recurring.alarm'
+            if alarm[2]:
+                dialog = dialog + '.named'
+            return self.translate(dialog,
                                   data={'time': nice_time(dt, use_ampm=True),
-                                        'recurrence': desc})
+                                        'recurrence': desc,
+                                        'name': alarm[2]})
         else:
             dt = self.get_alarm_local(alarm)
-            return nice_date_time(dt, now=now_local(), use_ampm=True)
+            dt_string = nice_date_time(dt, now=now_local(), use_ampm=True)
+            if alarm[2]:
+                return self.translate('alarm.named',
+                        data={'datetime': dt_string,
+                              'name': alarm[2]})
+            else:
+                return dt_string
 
     @intent_file_handler('query.next.alarm.intent')
     def handle_query_next(self, message):
@@ -687,8 +694,8 @@ class AlarmSkill(MycroftSkill):
         desc = []
         for alarm in self.settings["alarm"]:
             desc.append(self._describe(alarm))
-            if len(desc) > 3:
-                break
+            #if len(desc) > 3:
+            #    break
         
         items_string = ''
         if desc:    
@@ -700,6 +707,22 @@ class AlarmSkill(MycroftSkill):
             self.speak_dialog("alarms.list.multi",
                               data={'count': total,
                                     'items': items_string})
+            
+    def _fuzzy_match_word_from_phrase(self, word, phrase, threshold):
+        matched = False
+        score = 0
+        phrase_split = phrase.split(' ')
+        word_split_len = len(word.split(' '))
+        
+        for i in range(len(phrase_split) - word_split_len, -1, -1):
+            phrase_comp = ' '.join(phrase_split[i:i + word_split_len])
+            score_curr = fuzzy_match(phrase_comp, word.lower())
+            
+            if score_curr > score and score_curr >= threshold:
+                score = score_curr
+                matched = True
+                
+        return matched
 
     @intent_handler(IntentBuilder("").require("Delete").require("All").
                     require("Alarm"))
