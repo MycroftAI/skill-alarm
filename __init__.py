@@ -683,9 +683,18 @@ class AlarmSkill(MycroftSkill):
 
         self.speak_dialog("next.alarm", data={"when": self._describe(alarm),
                                               "duration": reltime})
-
-    @intent_file_handler('alarm.status.intent')
+        
+    @intent_handler(IntentBuilder("").require("Query").require("Alarm"))
+    #@intent_file_handler('alarm.status.intent')
     def handle_status(self, message):
+        
+        utt = message.data.get("utterance")
+        self.log.info(f'handle_status: Utterance: {utt}')
+        
+        status, alarms = self._get_alarm_matches(utt)
+        self.log.info(f'handle_status: Status: {status}')
+        self.log.info(f'handle_status: alarms: {alarms}')
+        
         total = len(self.settings["alarm"])
         if not total:
             self.speak_dialog("alarms.list.empty")
@@ -707,6 +716,32 @@ class AlarmSkill(MycroftSkill):
             self.speak_dialog("alarms.list.multi",
                               data={'count': total,
                                     'items': items_string})
+    
+    def _get_alarm_matches(self, utt, alarm=None, max_results=1,
+                           dialog='ask.which.alarm', is_response=False):
+        """ Get list of timers that match based on a user utterance
+            Args:
+                utt (str): string spoken by the user
+                timers (list): list of timers to match against
+                max_results (int): max number of results desired
+                dialog (str): name of dialog file used for disambiguation
+                is_response (bool): is this being called by get_response
+            Returns:
+                (str): ["All", "Matched", "No Match Found", or "User Cancelled"]
+                (list): list of matched timers
+        """
+        alarm = alarm or self.settings['alarm']
+        all_words = self.translate_list('all')
+        status = ["All", "Matched", "No Match Found", "User Cancelled"]
+
+        if alarm is None or len(alarm) == 0:
+            self.log.error("Cannot get match. No active timers.")
+            return (status[2], None)
+        elif utt and any(i.strip() in utt for i in all_words):
+            return (status[0], alarm[0:max_results - 1])
+        
+        # Nothing matched
+        return (status[2], None)
             
     def _fuzzy_match_word_from_phrase(self, word, phrase, threshold):
         matched = False
