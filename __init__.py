@@ -719,7 +719,8 @@ class AlarmSkill(MycroftSkill):
     
     def _get_alarm_matches(self, utt, alarm=None, max_results=1,
                            dialog='ask.which.alarm', is_response=False):
-        """ Get list of timers that match based on a user utterance
+        """ 
+            Get list of timers that match based on a user utterance
             Args:
                 utt (str): string spoken by the user
                 timers (list): list of alarm to match against
@@ -730,40 +731,106 @@ class AlarmSkill(MycroftSkill):
                 (str): ["All", "Matched", "No Match Found", or "User Cancelled"]
                 (list): list of matched alarm
         """
-        alarm = alarm or self.settings['alarm']
+        alarms = alarm or self.settings['alarm']
         all_words = self.translate_list('all')
         status = ["All", "Matched", "No Match Found", "User Cancelled"]
 
-        if alarm is None or len(alarm) == 0:
+        if alarms is None or len(alarms) == 0:
             self.log.error("Cannot get match. No active timers.")
             return (status[2], None)
         elif utt and any(i.strip() in utt for i in all_words):
-            self.log.info(alarm[0:0])
-            return (status[0], alarm[0:max_results - 1])
+            return (status[0], alarms)
+        
+        # Extract Duration
+        when = extract_datetime(utt)
+        utt_no_datetime = None
+        if not when == None:
+            utt_no_datetime = when[1]
+            when = when[0]
+            
+        self.log.info(f'_get_alarm_matches: Extracted Datetime: {when}')
+            
+        # Will return dt of unmatched string
+        today = extract_datetime("today")
+        today = today[0]
+        
+        # Check the time if it's midnight. This is to check if the user
+        # said a recurring alarm with only the Day or if the user did 
+        # specify to set an alarm on midnight. If it's confirmed that 
+        # it's for a day only, then get another response from the user 
+        # to clarify what time on that day the recurring alarm is.
+        is_midnight = self._check_if_utt_has_midnight(utt,
+                                                      when,
+                                                      self.threshold)
+        
+        self.log.info(f'_get_alarm_matches: Is Midnight?: {is_midnight}')
+        
+        if when == today[0] and not is_midnight:
+            when = None
+        
+        recur = None
+        for word in self.recurrence_dict:
+            is_match = self._fuzzy_match_word_from_phrase(word,
+                                                          utt,
+                                                          self.threshold)
+            if is_match:
+                recur = self._create_day_set(utt)
+                break
+            
+        alarm_to_match = None
+        duration_matches = None
+        if when:                
+            if recur:
+                alarm_to_match = self._create_recurring_alarm(when, recur)
+                
+                for item in alarms:
+                    if item[0:1] == alarm_to_match:
+                        return (status[1], item)
+                    
+                return (status[2], None)
+            else:
+                alarm_to_match = [to_utc(when).timestamp(), ""]
+                
+            duration_matches = [a for a in alarms if a[0] == alarm_to_match[0]]
+        
+        self.log.info(f'_get_alarm_matches: Alarm to Match: {alarm_to_match}')
+        self.log.info(f'_get_alarm_matches: Duration Matches: {duration_matches}')
+        
+        utt = utt_no_datetime or utt
         
         # Extract Ordinal/Cardinal Numbers
         number = extract_number(utt, ordinals=True)
-        if number and number > 0 and number <= len(alarm):
+        if number and number > 0 and number <= len(alarms):
             number = int(number)
         else:
             number = None
+        
+        alarms = duration_matches or alarms
             
         # Extract Name
-        name_matches = [a for a in alarm if a[2] and \
+        name_matches = [a for a in alarms if a[2] and \
                         self._fuzzy_match_word_from_phrase(a[2],
                                                            utt,
-                                                           self.threshold)
-                       ]
-        if name_matches and not number:
-            alarm = name_matches
+                                                           self.threshold)]
+        
+        if name_matches and alarm_to_match:
+            for item in name_matches:
+                if item[0:1] == alarm_to_match:
+                    return (status[1], item)
+                
+        elif name_matches and not number:
+            alarms = name_matches
             reply = self.get_response(dialog)
-            return self._get_alarm_matches(reply, alarm = alarm)
+            if reply:
+                return self._get_alarm_matches(reply, alarm = alarms)
+            else:
+                return (status[3], None)
         elif name_matches and number and number <= len(name_matches):
-            alarm = name_matches[number-1]
-            return (status[1], alarm)
+            alarms = name_matches[number-1]
+            return (status[1], alarms)
         elif not name_matches and number:
-            alarm = alarm[number-1]
-            return (status[1], alarm)
+            alarms = alarms[number-1]
+            return (status[1], alarms)
         
         # Nothing matched
         return (status[2], None)
@@ -1039,12 +1106,13 @@ class AlarmSkill(MycroftSkill):
 
             # Notify all processes to update their loaded configs
             self.bus.emit(Message('configuration.updated'))
-            del self.settings["user_beep_setting"]
+            if "user_beep_setting" in self.settings:
+                del self.settings["user_beep_setting"]
 
     def converse(self, utterances, lang="en-us"):
         if self.has_expired_alarm():
             # An alarm is going off
-            if self.voc_match(utterances[0], "StopBeeping"):
+            if utterances and self.voc_match(utterances[0], "StopBeeping"):
                 # Stop the alarm
                 self._stop_expired_alarm()
                 return True  # and consume this phrase
