@@ -722,13 +722,13 @@ class AlarmSkill(MycroftSkill):
         """ Get list of timers that match based on a user utterance
             Args:
                 utt (str): string spoken by the user
-                timers (list): list of timers to match against
+                timers (list): list of alarm to match against
                 max_results (int): max number of results desired
                 dialog (str): name of dialog file used for disambiguation
                 is_response (bool): is this being called by get_response
             Returns:
                 (str): ["All", "Matched", "No Match Found", or "User Cancelled"]
-                (list): list of matched timers
+                (list): list of matched alarm
         """
         alarm = alarm or self.settings['alarm']
         all_words = self.translate_list('all')
@@ -738,7 +738,32 @@ class AlarmSkill(MycroftSkill):
             self.log.error("Cannot get match. No active timers.")
             return (status[2], None)
         elif utt and any(i.strip() in utt for i in all_words):
+            self.log.info(alarm[0:0])
             return (status[0], alarm[0:max_results - 1])
+        
+        # Extract Ordinal/Cardinal Numbers
+        number = extract_number(utt, ordinals=True)
+        if number and number > 0 and number <= len(alarm):
+            number = int(number)
+        else:
+            number = None
+            
+        # Extract Name
+        name_matches = [a for a in alarm if a[2] and \
+                        self._fuzzy_match_word_from_phrase(a[2],
+                                                           utt,
+                                                           self.threshold)
+                       ]
+        if name_matches and not number:
+            alarm = name_matches
+            reply = self.get_response(dialog)
+            return self._get_alarm_matches(reply, alarm = alarm)
+        elif name_matches and number and number <= len(name_matches):
+            alarm = name_matches[number-1]
+            return (status[1], alarm)
+        elif not name_matches and number:
+            alarm = alarm[number-1]
+            return (status[1], alarm)
         
         # Nothing matched
         return (status[2], None)
