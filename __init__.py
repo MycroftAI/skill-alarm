@@ -296,18 +296,21 @@ class AlarmSkill(MycroftSkill):
             days.append(abbr[int(day)])
         if days:
             rule = "FREQ=WEEKLY;INTERVAL=1;BYDAY=" + ",".join(days)
+        
+        if when:
+            when = to_utc(when)
+            alarm = [when.timestamp(), rule]
 
-        when = to_utc(when)
-        alarm = [when.timestamp(), rule]
-
-        # Create a repeating rule that starts in the past, enough days
-        # back that it encompasses any repeat.
-        past = when + timedelta(days=-45)
-        rr = rrulestr("RRULE:" + alarm[1], dtstart=past)
-        now = to_utc(now_utc())
-        # Get the first repeat that happens after right now
-        next = rr.after(now)
-        return [to_utc(next).timestamp(), alarm[1]]
+            # Create a repeating rule that starts in the past, enough days
+            # back that it encompasses any repeat.
+            past = when + timedelta(days=-45)
+            rr = rrulestr("RRULE:" + alarm[1], dtstart=past)
+            now = to_utc(now_utc())
+            # Get the first repeat that happens after right now
+            next = rr.after(now)
+            return [to_utc(next).timestamp(), alarm[1]]
+        else:
+            return [None, rule]
 
     def has_expired_alarm(self):
         # True is an alarm should be 'going off' now.  Snoozed alarms don't
@@ -684,38 +687,48 @@ class AlarmSkill(MycroftSkill):
         self.speak_dialog("next.alarm", data={"when": self._describe(alarm),
                                               "duration": reltime})
         
-    @intent_handler(IntentBuilder("").require("Query").require("Alarm"))
+    @intent_handler(IntentBuilder("").require("Query").require("Alarm").
+                    optionally("Recurring"))
     #@intent_file_handler('alarm.status.intent')
     def handle_status(self, message):
         
         utt = message.data.get("utterance")
         self.log.info(f'handle_status: Utterance: {utt}')
         
-        status, alarms = self._get_alarm_matches(utt)
+        status, alarms = self._get_alarm_matches(utt, 
+                                                 alarm=self.settings["alarm"], 
+                                                 max_results=3,
+                                                 dialog='ask.which.alarm',
+                                                 is_response=False)
         self.log.info(f'handle_status: Status: {status}')
         self.log.info(f'handle_status: alarms: {alarms}')
         
-        total = len(self.settings["alarm"])
-        if not total:
+        total = None
+        if not alarms:
             self.speak_dialog("alarms.list.empty")
             return
+        else:
+            total = len(alarms)
 
         desc = []
-        for alarm in self.settings["alarm"]:
+        for alarm in alarms:
             desc.append(self._describe(alarm))
-            #if len(desc) > 3:
-            #    break
         
         items_string = ''
         if desc:    
             items_string = join_list(desc, self.translate('and'))
 
-        if total == 1:
-            self.speak_dialog("alarms.list.single", data={'item': desc[0]})
+        if status == 'No Match Found':
+            self.dialog('alarm.not.found')
+        elif status == 'User Cancelled':
+            return
         else:
-            self.speak_dialog("alarms.list.multi",
-                              data={'count': total,
-                                    'items': items_string})
+            if total == 1:
+                self.speak_dialog("alarms.list.single", data={'item': desc[0]})
+            else:
+                self.speak_dialog("alarms.list.multi",
+                                data={'count': total,
+                                        'items': items_string})
     
     def _get_alarm_matches(self, utt, alarm=None, max_results=1,
                            dialog='ask.which.alarm', is_response=False):
@@ -741,7 +754,7 @@ class AlarmSkill(MycroftSkill):
         elif utt and any(i.strip() in utt for i in all_words):
             return (status[0], alarms)
         
-        # Extract Duration
+        # Extract Alarm Time
         when = extract_datetime(utt)
         utt_no_datetime = None
         if not when == None:
@@ -765,36 +778,33 @@ class AlarmSkill(MycroftSkill):
         
         self.log.info(f'_get_alarm_matches: Is Midnight?: {is_midnight}')
         
-        if when == today[0] and not is_midnight:
-            when = None
+        if when == today and not is_midnight:
+            when = None    
+    
+        time_matches = None
+        if when:
+            time_alarm = to_utc(when).timestamp()
+            time_matches = [a for a in alarms if a[0] == time_alarm]
+
+        self.log.info(f'_get_alarm_matches: Alarm Time Matches: {time_matches}')
         
+        # Extract Recurrence        
         recur = None
+        recurrence_matches = None
         for word in self.recurrence_dict:
             is_match = self._fuzzy_match_word_from_phrase(word,
-                                                          utt,
+                                                          utt.lower(),
                                                           self.threshold)
+            
+            #self.log.info(f'_get_alarm_matches: Comparing "{word}" in "{utt.lower()}"')
             if is_match:
                 recur = self._create_day_set(utt)
+                alarm_recur = self._create_recurring_alarm(when, recur)
+                recurrence_matches = [a for a in alarms if a[1] == alarm_recur[1]]
                 break
             
-        alarm_to_match = None
-        duration_matches = None
-        if when:                
-            if recur:
-                alarm_to_match = self._create_recurring_alarm(when, recur)
-                
-                for item in alarms:
-                    if item[0:1] == alarm_to_match:
-                        return (status[1], item)
-                    
-                return (status[2], None)
-            else:
-                alarm_to_match = [to_utc(when).timestamp(), ""]
-                
-            duration_matches = [a for a in alarms if a[0] == alarm_to_match[0]]
-        
-        self.log.info(f'_get_alarm_matches: Alarm to Match: {alarm_to_match}')
-        self.log.info(f'_get_alarm_matches: Duration Matches: {duration_matches}')
+        self.log.info(f'_get_alarm_matches: Recurring on: {recur}')
+        self.log.info(f'_get_alarm_matches: Leftover: {utt_no_datetime}')
         
         utt = utt_no_datetime or utt
         
@@ -804,35 +814,63 @@ class AlarmSkill(MycroftSkill):
             number = int(number)
         else:
             number = None
-        
-        alarms = duration_matches or alarms
+            
+        self.log.info(f'_get_alarm_matches: Number Match: {number}')
             
         # Extract Name
         name_matches = [a for a in alarms if a[2] and \
                         self._fuzzy_match_word_from_phrase(a[2],
                                                            utt,
                                                            self.threshold)]
+        self.log.info(f'_get_alarm_matches: Name Matches: {name_matches}')
         
-        if name_matches and alarm_to_match:
-            for item in name_matches:
-                if item[0:1] == alarm_to_match:
-                    return (status[1], item)
+        # Match Everything
+        alarm_to_match = None
+        if when:                
+            if recur:
+                alarm_to_match = alarm_recur
                 
-        elif name_matches and not number:
-            alarms = name_matches
-            reply = self.get_response(dialog)
+            else:
+                alarm_to_match = [time_alarm, ""]
+                
+        self.log.info(f'_get_alarm_matches: Alarm to Match: {alarm_to_match}')
+        
+        # Find the Intersection of the Alarms list and all the matched alarms
+        if when and time_matches:
+            alarms = [a for a in alarms if a in time_matches]
+        if recur and recurrence_matches:
+            alarms = [a for a in alarms if a in recurrence_matches]
+        if name_matches:
+            alarms = [a for a in alarms if a in name_matches]
+                
+        self.log.info(f'_get_alarm_matches: Alarms: {alarms}')
+        
+        if number and number <= len(alarms):
+            return (status[1], alarms[number - 1])
+        elif alarms and len(alarms) <= max_results:
+            return (status[1], alarms)
+        elif alarms and len(alarms) > max_results:
+            desc = []
+            for alarm in alarms:
+                desc.append(self._describe(alarm))            
+                
+            items_string = ''
+            if desc:    
+                items_string = join_list(desc, self.translate('and'))
+                
+            reply = self.get_response(dialog, data = {
+                'number': len(alarms),
+                'list': items_string,
+            }, num_retries = 1)
             if reply:
-                return self._get_alarm_matches(reply, alarm = alarms)
+                return self._get_alarm_matches(reply,
+                                               alarm=alarms,
+                                               max_results=max_results,
+                                               dialog=dialog,
+                                               is_response=True)
             else:
                 return (status[3], None)
-        elif name_matches and number and number <= len(name_matches):
-            alarms = name_matches[number-1]
-            return (status[1], alarms)
-        elif not name_matches and number:
-            alarms = alarms[number-1]
-            return (status[1], alarms)
         
-        # Nothing matched
         return (status[2], None)
             
     def _fuzzy_match_word_from_phrase(self, word, phrase, threshold):
