@@ -394,7 +394,7 @@ class AlarmSkill(MycroftSkill):
         if utt_no_datetime:
             name = self._get_alarm_name(utt_no_datetime)
         else:
-            name = None
+            name = ""
             
         # Will return dt of unmatched string
         today = extract_datetime("today")
@@ -673,23 +673,9 @@ class AlarmSkill(MycroftSkill):
                               'name': alarm[2]})
             else:
                 return dt_string
-
-    @intent_file_handler('query.next.alarm.intent')
-    def handle_query_next(self, message):
-        total = len(self.settings["alarm"])
-        if not total:
-            self.speak_dialog("alarms.list.empty")
-            return
-
-        alarm = self.settings["alarm"][0]
-        reltime = nice_relative_time(self.get_alarm_local(alarm))
-
-        self.speak_dialog("next.alarm", data={"when": self._describe(alarm),
-                                              "duration": reltime})
         
-    @intent_handler(IntentBuilder("").require("Query").require("Alarm").
-                    optionally("Recurring"))
-    #@intent_file_handler('alarm.status.intent')
+    @intent_handler(IntentBuilder("").require("Query").optionally("Next").
+                    require("Alarm").optionally("Recurring"))
     def handle_status(self, message):
         
         utt = message.data.get("utterance")
@@ -722,8 +708,15 @@ class AlarmSkill(MycroftSkill):
             self.dialog('alarm.not.found')
         elif status == 'User Cancelled':
             return
+        elif status == 'Next':
+            reltime = nice_relative_time(self.get_alarm_local(alarms[0]))
+
+            self.speak_dialog("next.alarm",
+                              data={"when": self._describe(alarms[0]),
+                                    "duration": reltime})
         else:
             if total == 1:
+                reltime = nice_relative_time(self.get_alarm_local(alarms[0]))
                 self.speak_dialog("alarms.list.single", data={'item': desc[0]})
             else:
                 self.speak_dialog("alarms.list.multi",
@@ -746,13 +739,16 @@ class AlarmSkill(MycroftSkill):
         """
         alarms = alarm or self.settings['alarm']
         all_words = self.translate_list('all')
-        status = ["All", "Matched", "No Match Found", "User Cancelled"]
+        next_words = self.translate_list('next')
+        status = ["All", "Matched", "No Match Found", "User Cancelled", "Next"]
 
         if alarms is None or len(alarms) == 0:
             self.log.error("Cannot get match. No active timers.")
             return (status[2], None)
         elif utt and any(i.strip() in utt for i in all_words):
             return (status[0], alarms)
+        elif utt and any(i.strip() in utt for i in next_words):
+            return (status[4], [alarms[0]])
         
         # Extract Alarm Time
         when = extract_datetime(utt)
@@ -836,6 +832,7 @@ class AlarmSkill(MycroftSkill):
         self.log.info(f'_get_alarm_matches: Alarm to Match: {alarm_to_match}')
         
         # Find the Intersection of the Alarms list and all the matched alarms
+        orig_count = len(alarms)
         if when and time_matches:
             alarms = [a for a in alarms if a in time_matches]
         if recur and recurrence_matches:
@@ -845,10 +842,17 @@ class AlarmSkill(MycroftSkill):
                 
         self.log.info(f'_get_alarm_matches: Alarms: {alarms}')
         
+        # If number of alarms filtered were the same, assume user asked for
+        # All alarms    
+        if len(alarms) == orig_count and max_results > 1:
+            return (status[0], alarms)
+        # Return immediately if there is ordinal
         if number and number <= len(alarms):
-            return (status[1], alarms[number - 1])
+            return (status[1], [alarms[number - 1]])
+        # Return immediately if within maximum results
         elif alarms and len(alarms) <= max_results:
             return (status[1], alarms)
+        # Ask for reply from user and iterate the function
         elif alarms and len(alarms) > max_results:
             desc = []
             for alarm in alarms:
@@ -871,6 +875,7 @@ class AlarmSkill(MycroftSkill):
             else:
                 return (status[3], None)
         
+        # No matches found
         return (status[2], None)
             
     def _fuzzy_match_word_from_phrase(self, word, phrase, threshold):
@@ -1144,8 +1149,7 @@ class AlarmSkill(MycroftSkill):
 
             # Notify all processes to update their loaded configs
             self.bus.emit(Message('configuration.updated'))
-            if "user_beep_setting" in self.settings:
-                del self.settings["user_beep_setting"]
+            del self.settings["user_beep_setting"]
 
     def converse(self, utterances, lang="en-us"):
         if self.has_expired_alarm():
