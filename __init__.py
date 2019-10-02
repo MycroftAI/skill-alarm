@@ -717,11 +717,13 @@ class AlarmSkill(MycroftSkill):
         else:
             if total == 1:
                 reltime = nice_relative_time(self.get_alarm_local(alarms[0]))
-                self.speak_dialog("alarms.list.single", data={'item': desc[0]})
+                self.speak_dialog("alarms.list.single",
+                                  data={'item': desc[0],
+                                        'duration': reltime})
             else:
                 self.speak_dialog("alarms.list.multi",
                                 data={'count': total,
-                                        'items': items_string})
+                                      'items': items_string})
     
     def _get_alarm_matches(self, utt, alarm=None, max_results=1,
                            dialog='ask.which.alarm', is_response=False):
@@ -894,8 +896,8 @@ class AlarmSkill(MycroftSkill):
                 
         return matched
 
-    @intent_handler(IntentBuilder("").require("Delete").require("All").
-                    require("Alarm"))
+ #   @intent_handler(IntentBuilder("").require("Delete").require("All").
+ #                   require("Alarm"))
     def handle_delete_all(self, message):
         total = len(self.settings["alarm"])
         if not total:
@@ -956,7 +958,8 @@ class AlarmSkill(MycroftSkill):
                                   data={'desc': desc}) == 'yes':
                     self.settings["alarm"].remove(alarm)
                     self._schedule()
-                    self.speak_dialog("alarm.cancelled" + recurring)
+                    self.speak_dialog("alarm.cancelled.desc" + recurring,
+                                      data={'desc': desc})
                     return True
                 else:
                     self.speak_dialog('alarm.delete.cancelled')
@@ -1001,62 +1004,48 @@ class AlarmSkill(MycroftSkill):
             return
 
         utt = message.data.get("utterance") or ""
-
-        # First see if the user spoke a date/time in the delete request
-        when = extract_datetime(utt)
-        now = extract_datetime("now")
-
-        if when and when[0] != now[0]:
-            if self._delete_alarm_with_dt(when, utt):
-                return
+        
+        status, alarms = self._get_alarm_matches(utt, 
+                                                 alarm=self.settings["alarm"], 
+                                                 max_results=1,
+                                                 dialog='ask.which.alarm.delete',
+                                                 is_response=False)
+        self.log.info(f'handle_delete: Status: {status}')
+        self.log.info(f'handle_delete: alarms: {alarms}')
+        
+        if alarms:
+            total = len(alarms)
+        else:
+            total = None
 
         if total == 1:
-            alarm = self.settings["alarm"][0]
-            desc = self._describe(alarm)
-            recurring = ".recurring" if alarm[1] else ""
+            desc = self._describe(alarms[0])
+            recurring = ".recurring" if alarms[0][1] else ""
             if self.ask_yesno('ask.cancel.desc.alarm' + recurring,
                               data={'desc': desc}) == 'yes':
-                self.settings["alarm"] = []
+                del self.settings["alarm"][self.settings["alarm"].index(alarms[0])]
                 self._schedule()
-                self.speak_dialog("alarm.cancelled" + recurring)
+                self.speak_dialog("alarm.cancelled.desc" + recurring,
+                                  data={'desc': desc})
                 return
             else:
                 self.speak_dialog("alarm.delete.cancelled")
                 # As the user did not confirm to delete
                 # return True to skip all the remaining conditions
                 return
-        else:
-            self.handle_status(message)
-            resp = self.get_response('ask.which.alarm.delete')
-            if not resp:
-                return
-            # From the response we perform the same conditions above
-            when = extract_datetime(resp)
-            if when and when[0] != now[0]:
-                if self._delete_alarm_with_dt(when, str(resp)):
-                    return
-
-            # Attempt to delete by spoken index
-            idx = extract_number(resp, ordinals=True)
-            if idx and idx > 0 and idx <= total:
-                idx = int(idx)
-                alarm = self.settings["alarm"][idx-1]
-                desc = self._describe(alarm)
-                recurring = ".recurring" if alarm[1] else ""
-                del self.settings["alarm"][idx-1]
-                self._schedule()
-                self.speak_dialog("alarm.cancelled" + recurring, data={'desc': desc})
-                return
-
-            # Attempt to match by words, e.g. "all", "both"
-            if self.voc_match(resp, 'All'):
+        elif status in ['Matched', 'All', 'Next']:
+            if self.ask_yesno('ask.cancel.alarm.plural',
+                              data={"count": total}) == 'yes':
                 self.settings["alarm"] = []
                 self._schedule()
-                self.speak_dialog('alarms.cancelled')
-                return
-
+                self.speak_dialog('alarm.cancelled.multi',
+                                data = {"count": total})
+            return
+        elif not total:
             # Failed to delete
             self.speak_dialog("alarm.not.found")
+        
+        return
 
     def _alarm_expired(self):
         self.sound_name = self.settings["sound"]  # user-selected alarm sound
