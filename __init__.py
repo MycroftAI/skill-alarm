@@ -538,9 +538,7 @@ class AlarmSkill(MycroftSkill):
         matched = False
         if init_time.time() == datetime(1970, 1, 1, 0, 0, 0).time():            
             for word in self.translate_list('midnight'):
-                matched = self._fuzzy_match_word_from_phrase(
-                    word, utt, threshold
-                )
+                matched = self._fuzzy_match(word, utt, threshold)
                 if matched:
                     return matched
 
@@ -743,14 +741,11 @@ class AlarmSkill(MycroftSkill):
         all_words = self.translate_list('all')
         next_words = self.translate_list('next')
         status = ["All", "Matched", "No Match Found", "User Cancelled", "Next"]
-
+        
+        # No alarms
         if alarms is None or len(alarms) == 0:
             self.log.error("Cannot get match. No active timers.")
             return (status[2], None)
-        elif utt and any(i.strip() in utt for i in all_words):
-            return (status[0], alarms)
-        elif utt and any(i.strip() in utt for i in next_words):
-            return (status[4], [alarms[0]])
         
         # Extract Alarm Time
         when = extract_datetime(utt)
@@ -780,19 +775,18 @@ class AlarmSkill(MycroftSkill):
             when = None    
     
         time_matches = None
+        time_alarm = None
         if when:
             time_alarm = to_utc(when).timestamp()
-            time_matches = [a for a in alarms if a[0] == time_alarm]
-
+            time_matches = [a for a in alarms if abs(a[0] - time_alarm) <= 60]
+                
         self.log.info(f'_get_alarm_matches: Alarm Time Matches: {time_matches}')
         
         # Extract Recurrence        
         recur = None
         recurrence_matches = None
         for word in self.recurrence_dict:
-            is_match = self._fuzzy_match_word_from_phrase(word,
-                                                          utt.lower(),
-                                                          self.threshold)
+            is_match = self._fuzzy_match(word, utt.lower(), self.threshold)
             
             #self.log.info(f'_get_alarm_matches: Comparing "{word}" in "{utt.lower()}"')
             if is_match:
@@ -817,9 +811,7 @@ class AlarmSkill(MycroftSkill):
             
         # Extract Name
         name_matches = [a for a in alarms if a[2] and \
-                        self._fuzzy_match_word_from_phrase(a[2],
-                                                           utt,
-                                                           self.threshold)]
+                        self._fuzzy_match(a[2], utt, self.threshold)]
         self.log.info(f'_get_alarm_matches: Name Matches: {name_matches}')
         
         # Match Everything
@@ -837,16 +829,35 @@ class AlarmSkill(MycroftSkill):
         orig_count = len(alarms)
         if when and time_matches:
             alarms = [a for a in alarms if a in time_matches]
+            for a in alarms:
+                self.log.info(f'_get_alarm_matches: (1) is {a} in Time Matches? {a in time_matches}')
+            self.log.info(f'_get_alarm_matches: (1) Alarms: {alarms}')
         if recur and recurrence_matches:
             alarms = [a for a in alarms if a in recurrence_matches]
+            self.log.info(f'_get_alarm_matches: (2) Alarms: {alarms}')
         if name_matches:
             alarms = [a for a in alarms if a in name_matches]
+            self.log.info(f'_get_alarm_matches: (3) Alarms: {alarms}')
                 
-        self.log.info(f'_get_alarm_matches: Alarms: {alarms}')
+        for a in alarms:
+            self.log.info(f'_get_alarm_matches: Alarms: {a}')
+            
+        # Utterance refers to all alarms
+        if utt and any(self._fuzzy_match(i, utt, 1) for i in all_words):
+            return (status[0], alarms)
+        # Utterance refers to the next alarm to go off
+        elif utt and any(self._fuzzy_match(i, utt, 1) for i in next_words):
+            return (status[4], [alarms[0]])
         
+        # Given something to match but no match found
+        if (number and number > len(alarm)) or \
+           (recur and not recurrence_matches) or \
+           (when and not time_matches):
+            return (status[2], None)
         # If number of alarms filtered were the same, assume user asked for
         # All alarms    
-        if len(alarms) == orig_count and max_results > 1:
+        if len(alarms) == orig_count and max_results > 1 and \
+            not number and not when and not recur:
             return (status[0], alarms)
         # Return immediately if there is ordinal
         if number and number <= len(alarms):
@@ -880,7 +891,18 @@ class AlarmSkill(MycroftSkill):
         # No matches found
         return (status[2], None)
             
-    def _fuzzy_match_word_from_phrase(self, word, phrase, threshold):
+    def _fuzzy_match(self, word, phrase, threshold):
+        """ 
+            Search a phrase to another phrase using fuzzy_match. Matches on a
+            per word basis, and will not match if word is a subword.
+            Args:
+                word (str): string to be searched on a phrase
+                phrase (str): string to be matched against the word
+                threshold (int): minimum fuzzy matching score to be considered a
+                    match
+            Returns:
+                (boolean): True if word is found in phrase. False if not.
+        """
         matched = False
         score = 0
         phrase_split = phrase.split(' ')
@@ -895,105 +917,6 @@ class AlarmSkill(MycroftSkill):
                 matched = True
                 
         return matched
-
- #   @intent_handler(IntentBuilder("").require("Delete").require("All").
- #                   require("Alarm"))
-    def handle_delete_all(self, message):
-        total = len(self.settings["alarm"])
-        if not total:
-            self.speak_dialog("alarms.list.empty")
-            return
-
-        # Confirm cancel alarms...
-        recurring = ".recurring" if self.settings["alarm"][0][1] else ""
-        prompt = ('ask.cancel.alarm' + recurring if total == 1
-                  else 'ask.cancel.alarm.plural')
-        if self.ask_yesno(prompt, data={"count": total}) == 'yes':
-            self.settings["alarm"] = []
-            self._schedule()
-            self.speak_dialog('alarms.cancelled')
-
-    def _delete_alarm_with_dt(self,when,utt):
-        # This method takes the utterance and extracted date-time (if any)
-        # and matches the timestamp with list of alarms. When a match is
-        # found we delete that particular alarm and return. If no timestamp
-        # is matched with the request, then we ask the user to specify
-        # time and day. Then we check the same conditions above.
-        # This also handles special cases when no time/day is specified
-        # Ex : morning, weekdays, weekends etc.
-
-        # Look for a match...
-        search = when[0]
-        when_utc = to_utc(search).timestamp()
-        self.log.debug("when_utc obtained is : " + str(when_utc))
-        alarm = None
-        # From the list of alarms, find the one that has same timestamp
-        # This condition gets alarm from all other cases
-        if 'weekend' not in utt:
-            for row in self.settings["alarm"]:
-                if when_utc == row[0]:
-                    alarm = row
-                    break
-
-        # Not sure if this is a faster approach
-        # TODO: Make a single condition for all the cases
-        elif 'weekend' in utt:
-            for row in self.settings["alarm"]:
-                if row[1] and 'BYDAY=SU,SA' in row[1]:
-                        for day in range(7):
-                            if (when_utc + (day * 86400.0)) == row[0]:
-                                alarm = row
-                                when_utc = when_utc + (day * 86400.0)
-                                break
-
-        if alarm:
-            dt = self.get_alarm_local(alarm)
-            desc = self._describe(alarm)
-            delta = search - dt
-            delta2 = dt - search
-            recurring = ".recurring" if alarm[1] else ""
-            # First check if we get the timestamp
-            if when_utc == alarm[0]:
-                if self.ask_yesno('ask.cancel.desc.alarm' + recurring,
-                                  data={'desc': desc}) == 'yes':
-                    self.settings["alarm"].remove(alarm)
-                    self._schedule()
-                    self.speak_dialog("alarm.cancelled.desc" + recurring,
-                                      data={'desc': desc})
-                    return True
-                else:
-                    self.speak_dialog('alarm.delete.cancelled')
-                    # As the user did not confirm to delete
-                    # return True to skip all the remaining conditions
-                    return True
-
-            if (abs(delta.total_seconds()) < 60 or
-                    abs(delta2.total_seconds()) < 60):
-                # Really close match, just delete it
-                # desc = self._describe(alarm)
-                self.settings["alarm"].remove(alarm)
-                self._schedule()
-                self.speak_dialog("alarm.cancelled.desc" + recurring,
-                                  data={'desc': desc})
-                return True
-
-            if (abs(delta.total_seconds()) < 60 * 60 * 2 or
-                    abs(delta2.total_seconds()) < 60 * 60 * 2):
-                # Not super close, get confirmation
-                if self.ask_yesno('ask.cancel.desc.alarm' + recurring,
-                                  data={'desc': desc}) == 'yes':
-                    self.settings["alarm"].remove(alarm)
-                    self._schedule()
-                    self.speak_dialog("alarm.cancelled" + recurring)
-                    return True
-                else:
-                    self.speak_dialog('alarm.delete.cancelled')
-                    # As the user did not confirm to delete
-                    # return True to skip all the remaining conditions
-                    return True
-        else:
-            # If no alarm is present check the remaining cases if any
-            return False
 
     #@intent_file_handler('delete.intent')
     @intent_handler(IntentBuilder("").require("Delete").require("Alarm"))
@@ -1023,7 +946,8 @@ class AlarmSkill(MycroftSkill):
             recurring = ".recurring" if alarms[0][1] else ""
             if self.ask_yesno('ask.cancel.desc.alarm' + recurring,
                               data={'desc': desc}) == 'yes':
-                del self.settings["alarm"][self.settings["alarm"].index(alarms[0])]
+                del self.settings["alarm"]\
+                    [self.settings["alarm"].index(alarms[0])]
                 self._schedule()
                 self.speak_dialog("alarm.cancelled.desc" + recurring,
                                   data={'desc': desc})
@@ -1033,11 +957,13 @@ class AlarmSkill(MycroftSkill):
                 # As the user did not confirm to delete
                 # return True to skip all the remaining conditions
                 return
-        elif status in ['Matched', 'All', 'Next']:
+        elif status in ['Next', 'All', 'Matched']:
             if self.ask_yesno('ask.cancel.alarm.plural',
                               data={"count": total}) == 'yes':
-                self.settings["alarm"] = []
-                self._schedule()
+                for a in alarms:
+                    del self.settings["alarm"]\
+                        [self.settings["alarm"].index(a)]
+                    self._schedule()
                 self.speak_dialog('alarm.cancelled.multi',
                                 data = {"count": total})
             return
