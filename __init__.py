@@ -677,15 +677,12 @@ class AlarmSkill(MycroftSkill):
     def handle_status(self, message):
         
         utt = message.data.get("utterance")
-        self.log.info(f'handle_status: Utterance: {utt}')
         
         status, alarms = self._get_alarm_matches(utt, 
                                                  alarm=self.settings["alarm"], 
                                                  max_results=3,
                                                  dialog='ask.which.alarm',
                                                  is_response=False)
-        self.log.info(f'handle_status: Status: {status}')
-        self.log.info(f'handle_status: alarms: {alarms}')
         
         total = None
         if not alarms:
@@ -754,8 +751,6 @@ class AlarmSkill(MycroftSkill):
             utt_no_datetime = when[1]
             when = when[0]
             
-        self.log.info(f'_get_alarm_matches: Extracted Datetime: {when}')
-            
         # Will return dt of unmatched string
         today = extract_datetime("today")
         today = today[0]
@@ -769,8 +764,6 @@ class AlarmSkill(MycroftSkill):
                                                       when,
                                                       self.threshold)
         
-        self.log.info(f'_get_alarm_matches: Is Midnight?: {is_midnight}')
-        
         if when == today and not is_midnight:
             when = None    
     
@@ -779,24 +772,17 @@ class AlarmSkill(MycroftSkill):
         if when:
             time_alarm = to_utc(when).timestamp()
             time_matches = [a for a in alarms if abs(a[0] - time_alarm) <= 60]
-                
-        self.log.info(f'_get_alarm_matches: Alarm Time Matches: {time_matches}')
         
         # Extract Recurrence        
         recur = None
         recurrence_matches = None
         for word in self.recurrence_dict:
             is_match = self._fuzzy_match(word, utt.lower(), self.threshold)
-            
-            #self.log.info(f'_get_alarm_matches: Comparing "{word}" in "{utt.lower()}"')
             if is_match:
                 recur = self._create_day_set(utt)
                 alarm_recur = self._create_recurring_alarm(when, recur)
                 recurrence_matches = [a for a in alarms if a[1] == alarm_recur[1]]
                 break
-            
-        self.log.info(f'_get_alarm_matches: Recurring on: {recur}')
-        self.log.info(f'_get_alarm_matches: Leftover: {utt_no_datetime}')
         
         utt = utt_no_datetime or utt
         
@@ -807,12 +793,9 @@ class AlarmSkill(MycroftSkill):
         else:
             number = None
             
-        self.log.info(f'_get_alarm_matches: Number Match: {number}')
-            
         # Extract Name
         name_matches = [a for a in alarms if a[2] and \
                         self._fuzzy_match(a[2], utt, self.threshold)]
-        self.log.info(f'_get_alarm_matches: Name Matches: {name_matches}')
         
         # Match Everything
         alarm_to_match = None
@@ -822,25 +805,15 @@ class AlarmSkill(MycroftSkill):
                 
             else:
                 alarm_to_match = [time_alarm, ""]
-                
-        self.log.info(f'_get_alarm_matches: Alarm to Match: {alarm_to_match}')
         
         # Find the Intersection of the Alarms list and all the matched alarms
         orig_count = len(alarms)
         if when and time_matches:
             alarms = [a for a in alarms if a in time_matches]
-            for a in alarms:
-                self.log.info(f'_get_alarm_matches: (1) is {a} in Time Matches? {a in time_matches}')
-            self.log.info(f'_get_alarm_matches: (1) Alarms: {alarms}')
         if recur and recurrence_matches:
             alarms = [a for a in alarms if a in recurrence_matches]
-            self.log.info(f'_get_alarm_matches: (2) Alarms: {alarms}')
         if name_matches:
             alarms = [a for a in alarms if a in name_matches]
-            self.log.info(f'_get_alarm_matches: (3) Alarms: {alarms}')
-                
-        for a in alarms:
-            self.log.info(f'_get_alarm_matches: Alarms: {a}')
             
         # Utterance refers to all alarms
         if utt and any(self._fuzzy_match(i, utt, 1) for i in all_words):
@@ -933,8 +906,6 @@ class AlarmSkill(MycroftSkill):
                                                  max_results=1,
                                                  dialog='ask.which.alarm.delete',
                                                  is_response=False)
-        self.log.info(f'handle_delete: Status: {status}')
-        self.log.info(f'handle_delete: alarms: {alarms}')
         
         if alarms:
             total = len(alarms)
