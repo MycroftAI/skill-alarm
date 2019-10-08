@@ -1,4 +1,4 @@
 \b^.*alarm.* (called|for|named) (?P<Name>.*) (every|for|on|at).*$
 \b^.*alarm.* (called|for|named) (?P<Name>.*)$
-\b^.* alarm (?P<Name>.*)$
+\b^.* alarm (?P<Name>.*) (every|for|on|at).*$
 \b^.* (?P<Name>.*) alarm$

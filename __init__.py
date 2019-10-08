@@ -269,7 +269,7 @@ class AlarmSkill(MycroftSkill):
     def _next_repeat(self, alarm):
         # evaluate recurrence to the next instance
         if len(alarm) == 3:
-            ref = datetime.fromtimestamp(alarm[2])  # repeat from original time (it was snoozed)
+            ref = datetime.fromtimestamp(alarm[1])  # repeat from original time (it was snoozed)
         else:
             ref = datetime.fromtimestamp(alarm[0])
 
@@ -297,7 +297,7 @@ class AlarmSkill(MycroftSkill):
         if days:
             rule = "FREQ=WEEKLY;INTERVAL=1;BYDAY=" + ",".join(days)
         
-        if when:
+        if when and rule:
             when = to_utc(when)
             alarm = [when.timestamp(), rule]
 
@@ -532,7 +532,7 @@ class AlarmSkill(MycroftSkill):
                                 return name.lower()
                         except IndexError:
                             pass
-        return None
+        return ''
         
     def _check_if_utt_has_midnight(self, utt, init_time, threshold):
         matched = False
@@ -683,7 +683,6 @@ class AlarmSkill(MycroftSkill):
                                                  max_results=3,
                                                  dialog='ask.which.alarm',
                                                  is_response=False)
-        
         total = None
         if not alarms:
             self.speak_dialog("alarms.list.empty")
@@ -788,7 +787,7 @@ class AlarmSkill(MycroftSkill):
         
         # Extract Ordinal/Cardinal Numbers
         number = extract_number(utt, ordinals=True)
-        if number and number > 0 and number <= len(alarms):
+        if number and number > 0:
             number = int(number)
         else:
             number = None
@@ -891,7 +890,6 @@ class AlarmSkill(MycroftSkill):
                 
         return matched
 
-    #@intent_file_handler('delete.intent')
     @intent_handler(IntentBuilder("").require("Delete").require("Alarm"))
     def handle_delete(self, message):
         total = len(self.settings["alarm"])
