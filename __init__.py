@@ -890,7 +890,8 @@ class AlarmSkill(MycroftSkill):
                 
         return matched
 
-    @intent_handler(IntentBuilder("").require("Delete").require("Alarm"))
+    @intent_handler(IntentBuilder("").require("Delete").require("Alarm").
+                    optionally("Recurring").optionally("Recurrence"))
     def handle_delete(self, message):
         total = len(self.settings["alarm"])
         if not total:
