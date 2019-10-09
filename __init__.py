@@ -678,28 +678,28 @@ class AlarmSkill(MycroftSkill):
         
         utt = message.data.get("utterance")
         
+        if not len(self.settings["alarm"]):
+            self.speak_dialog("alarms.list.empty")
+            return
+        
         status, alarms = self._get_alarm_matches(utt, 
                                                  alarm=self.settings["alarm"], 
                                                  max_results=3,
                                                  dialog='ask.which.alarm',
                                                  is_response=False)
         total = None
-        if not alarms:
-            self.speak_dialog("alarms.list.empty")
-            return
-        else:
-            total = len(alarms)
-
         desc = []
-        for alarm in alarms:
-            desc.append(self._describe(alarm))
+        if alarms:
+            total = len(alarms)
+            for alarm in alarms:
+                desc.append(self._describe(alarm))
         
         items_string = ''
         if desc:    
             items_string = join_list(desc, self.translate('and'))
 
         if status == 'No Match Found':
-            self.dialog('alarm.not.found')
+            self.speak_dialog('alarm.not.found')
         elif status == 'User Cancelled':
             return
         elif status == 'Next':
