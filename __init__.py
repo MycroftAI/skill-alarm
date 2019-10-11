@@ -778,12 +778,14 @@ class AlarmSkill(MycroftSkill):
                                                       self.threshold)
         
         if when == today and not is_midnight:
-            when = None    
+            when = None
     
         time_matches = None
         time_alarm = None
         if when:
             time_alarm = to_utc(when).timestamp()
+            if is_midnight:
+                time_alarm = time_alarm +  86400.0
             time_matches = [a for a in alarms\
                 if abs(a["timestamp"] - time_alarm) <= 60
             ]
