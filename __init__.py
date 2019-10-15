@@ -556,98 +556,9 @@ class AlarmSkill(MycroftSkill):
 
         return matched
                         
-
     @property
     def use_24hour(self):
         return self.config_core.get('time_format') == 'full'
-
-    def _while_beeping(self, message):
-        # Flash time on the display
-        if self.flash_state < 3:
-            if self.flash_state == 0:
-                alarm_timestamp = message.data["alarm_time"]
-                dt = self.get_alarm_local(timestamp=alarm_timestamp)
-                self._render_time(dt)
-            self.flash_state += 1
-        else:
-            self.enclosure.mouth_reset()
-            self.flash_state = 0
-
-        # Listen for cries of "Stop!!!" between beeps (or over beeps for long
-        # audio, which is generally quieter)
-        if not self.is_listening():
-            still_beeping = self.beep_process and self.beep_process.poll() == None
-            beep_duration = self.sounds[self.sound_name]
-            if not still_beeping or beep_duration > 10:
-                self.log.info("Auto listen...")
-                self.bus.emit(Message('mycroft.mic.listen'))
-
-    def _show_alarm_anim(self, dt):
-        # Animated confirmation of the alarm
-        self.enclosure.mouth_reset()
-
-        self._render_time(dt)
-        time.sleep(2)
-        self.enclosure.mouth_reset()
-
-        # Show an animation
-        # TODO: mouth_display_png() is choking images > 8x8
-        #       (likely on the enclosure side)
-        for i in range(1, 16):
-            png = join(abspath(dirname(__file__)),
-                       "anim",
-                       "Alarm-"+str(int(i))+"-1.png")
-            # self.enclosure.mouth_display_png(png, x=0, y=0, refresh=False,
-            #                                  invert=True)
-            png = join(abspath(dirname(__file__)),
-                       "anim",
-                       "Alarm-"+str(int(i))+"-2.png")
-            if i < 8:
-                self.enclosure.mouth_display_png(png, x=8, y=0, refresh=False,
-                                                 invert=True)
-            png = join(abspath(dirname(__file__)),
-                       "anim",
-                       "Alarm-"+str(int(i))+"-3.png")
-            self.enclosure.mouth_display_png(png, x=16, y=0, refresh=False,
-                                             invert=True)
-            png = join(abspath(dirname(__file__)),
-                       "anim",
-                       "Alarm-"+str(int(i))+"-4.png")
-            self.enclosure.mouth_display_png(png, x=24, y=0, refresh=False,
-                                             invert=True)
-
-            if i == 4:
-                time.sleep(1)
-            else:
-                time.sleep(0.15)
-        self.enclosure.mouth_reset()
-
-    def _render_time(self, datetime):
-        # Show the time in numbers "8:00 AM"
-        timestr = nice_time(datetime, speech=False, use_ampm=True,
-                            use_24hour=self.use_24hour)
-        x = 16 - ((len(timestr)*4) // 2)  # centers on display
-        if not self.use_24hour:
-            x += 1  # account for wider letters P and M, offset by the colon
-
-        # draw on the display
-        for ch in timestr:
-            if ch == ":":
-                png = "colon.png"
-                w = 2
-            elif ch == " ":
-                png = "blank.png"
-                w = 2
-            elif ch == 'A' or ch == 'P' or ch == 'M':
-                png = ch+".png"
-                w = 5
-            else:
-                png = ch+".png"
-                w = 4
-
-            png = join(abspath(dirname(__file__)), "anim", png)
-            self.enclosure.mouth_display_png(png, x=x, y=2, refresh=False)
-            x += w
 
     def _describe(self, alarm):
         if alarm["repeat_rule"]:
@@ -963,107 +874,6 @@ class AlarmSkill(MycroftSkill):
         
         return
 
-    def _alarm_expired(self):
-        self.sound_name = self.settings["sound"]  # user-selected alarm sound
-        if not self.sound_name or self.sound_name not in self.sounds:
-            # invalid sound name, use the default
-            self.sound_name = AlarmSkill.default_sound
-
-        if self.settings['start_quiet'] and self.mixer:
-            if not self.saved_volume:  # don't overwrite if already saved!
-                self.saved_volume = self.mixer.getvolume()
-                self.volume = 0    # increase by 10% each pass
-        else:
-            self.saved_volume = None
-        
-        self._disable_listen_beep()
-        
-        self._play_beep()
-        
-        # Once a second Flash the alarm and auto-listen
-        self.flash_state = 0
-        self.enclosure.deactivate_mouth_events()
-        alarm = self.settings["alarm"][0]
-        self.schedule_repeating_event(self._while_beeping, 0, 1,
-                                    name='Flash',
-                                    data={"alarm_time": alarm["timestamp"]})
-
-    def __end_beep(self):
-        self.cancel_scheduled_event('Beep')
-        self.beep_start_time = None
-        if self.beep_process:
-            try:
-                if self.beep_process.poll() == None:    # still running
-                    self.beep_process.kill()
-            except:
-                pass
-            self.beep_process = None
-        self._restore_volume()
-        self._restore_listen_beep()
-
-    def __end_flash(self):
-        self.cancel_scheduled_event('Flash')
-        self.enclosure.mouth_reset()
-        self.enclosure.activate_mouth_events()
-
-    def _stop_expired_alarm(self):
-        if self.has_expired_alarm():
-            self.__end_beep()
-            self.__end_flash()
-            self.cancel_scheduled_event('NextAlarm')
-
-            self._curate_alarms(0)  # end any expired alarm
-            self._schedule()
-            return True
-        else:
-            return False
-
-    def _restore_volume(self):
-        # Return global volume to the appropriate level if we've messed with it
-        if self.saved_volume:
-            self.mixer.setvolume(self.saved_volume[0])
-            self.saved_volume = None
-
-    def _disable_listen_beep(self):
-        user_config = LocalConf(USER_CONFIG)
-
-        if 'user_beep_setting' not in self.settings:
-            # Save any current local config setting
-            self.settings['user_beep_setting'] = user_config.get("confirm_listening", None)
-
-            # Disable in local config
-            user_config.merge({"confirm_listening": False})
-            user_config.store()
-
-            # Notify all processes to update their loaded configs
-            self.bus.emit(Message('configuration.updated'))
-
-    def _restore_listen_beep(self):
-        if 'user_beep_setting' in self.settings:
-            # Wipe from local config
-            new_conf_values = {"confirm_listening": False}
-            user_config = LocalConf(USER_CONFIG)
-
-            if self.settings["user_beep_setting"] is None and \
-                            "confirm_listening" in user_config:
-                del user_config["confirm_listening"]
-            else:
-                user_config.merge({"confirm_listening":
-                                   self.settings["user_beep_setting"]})
-            user_config.store()
-
-            # Notify all processes to update their loaded configs
-            self.bus.emit(Message('configuration.updated'))
-            del self.settings["user_beep_setting"]
-
-    def converse(self, utterances, lang="en-us"):
-        if self.has_expired_alarm():
-            # An alarm is going off
-            if utterances and self.voc_match(utterances[0], "StopBeeping"):
-                # Stop the alarm
-                self._stop_expired_alarm()
-                return True  # and consume this phrase
-
     @intent_file_handler('snooze.intent')
     def snooze_alarm(self, message):
         if not self.has_expired_alarm():
@@ -1097,6 +907,21 @@ class AlarmSkill(MycroftSkill):
                                         "snooze": original_time
                                      }
         self._schedule()
+    
+    @intent_file_handler('change.alarm.sound.intent')
+    def handle_change_alarm(self, message):
+        self.speak_dialog("alarm.change.sound")
+
+##########################################################################
+# Audio and Device Feedback
+
+    def converse(self, utterances, lang="en-us"):
+        if self.has_expired_alarm():
+            # An alarm is going off
+            if utterances and self.voc_match(utterances[0], "StopBeeping"):
+                # Stop the alarm
+                self._stop_expired_alarm()
+                return True  # and consume this phrase
 
     def _play_beep(self, message=None):
         """ Play alarm sound file """
@@ -1127,11 +952,6 @@ class AlarmSkill(MycroftSkill):
 
         self.cancel_scheduled_event('Beep')
         self.schedule_event(self._play_beep, to_system(next_beep), name='Beep')
-        try:
-            if self.beep_process and self.beep_process.poll() == None:
-                self.beep_process.kill()
-        except:
-            self.beep_process = None
 
         # Increase volume each pass until fully on
         if self.saved_volume:
@@ -1144,17 +964,187 @@ class AlarmSkill(MycroftSkill):
         except:
             self.beep_process = None
 
-    def stop(self):
-        return self._stop_expired_alarm()
-    
-    @intent_file_handler('change.alarm.sound.intent')
-    def handle_change_alarm(self, message):
-        self.speak_dialog("alarm.change.sound")
+    def _while_beeping(self, message):
+        if self.flash_state < 3:
+            if self.flash_state == 0:
+                alarm_timestamp = message.data["alarm_time"]
+                dt = self.get_alarm_local(timestamp=alarm_timestamp)
+                self._render_time(dt)
+            self.flash_state += 1
+        else:
+            self.enclosure.mouth_reset()
+            self.flash_state = 0
         
+        # Check if the WAV is still playing
+        if self.beep_process:
+            self.beep_process.poll()
+            if self.beep_process.returncode:
+                # The playback has ended
+                self.beep_process = None
+                
+    def __end_beep(self):
+        self.cancel_scheduled_event('Beep')
+        self.beep_start_time = None
+        if self.beep_process:
+            try:
+                if self.beep_process.poll() == None:    # still running
+                    self.beep_process.kill()
+            except:
+                pass
+            self.beep_process = None
+        self._restore_volume()
+        self._restore_listen_beep()
+        
+    def _restore_listen_beep(self):
+        if 'user_beep_setting' in self.settings:
+            # Wipe from local config
+            new_conf_values = {"confirm_listening": False}
+            user_config = LocalConf(USER_CONFIG)
+
+            if self.settings["user_beep_setting"] is None and \
+                            "confirm_listening" in user_config:
+                del user_config["confirm_listening"]
+            else:
+                user_config.merge({"confirm_listening":
+                                   self.settings["user_beep_setting"]})
+            user_config.store()
+
+            # Notify all processes to update their loaded configs
+            self.bus.emit(Message('configuration.updated'))
+            del self.settings["user_beep_setting"]
+
+    def _stop_expired_alarm(self):
+        if self.has_expired_alarm():
+            self.__end_beep()
+            self.__end_flash()
+            self.cancel_scheduled_event('NextAlarm')
+
+            self._curate_alarms(0)  # end any expired alarm
+            self._schedule()
+            return True
+        else:
+            return False
+
+    def _restore_volume(self):
+        # Return global volume to the appropriate level if we've messed with it
+        if self.saved_volume:
+            self.mixer.setvolume(self.saved_volume[0])
+            self.saved_volume = None
+
+    def _disable_listen_beep(self):
+        user_config = LocalConf(USER_CONFIG)
+
+        if 'user_beep_setting' not in self.settings:
+            # Save any current local config setting
+            self.settings['user_beep_setting'] = user_config.get("confirm_listening", None)
+
+            # Disable in local config
+            user_config.merge({"confirm_listening": False})
+            user_config.store()
+
+            # Notify all processes to update their loaded configs
+            self.bus.emit(Message('configuration.updated'))
+
+    def _alarm_expired(self):
+        self.sound_name = self.settings["sound"]  # user-selected alarm sound
+        if not self.sound_name or self.sound_name not in self.sounds:
+            # invalid sound name, use the default
+            self.sound_name = AlarmSkill.default_sound
+
+        if self.settings['start_quiet'] and self.mixer:
+            if not self.saved_volume:  # don't overwrite if already saved!
+                self.saved_volume = self.mixer.getvolume()
+                self.volume = 0    # increase by 10% each pass
+        else:
+            self.saved_volume = None
+        
+        self._disable_listen_beep()
+        
+        self._play_beep()
+        
+        # Once a second Flash the alarm and auto-listen
+        self.flash_state = 0
+        self.enclosure.deactivate_mouth_events()
+        alarm = self.settings["alarm"][0]
+        self.schedule_repeating_event(self._while_beeping, 0, 1,
+                                    name='Flash',
+                                    data={"alarm_time": alarm["timestamp"]})
+
+    def __end_flash(self):
+        self.cancel_scheduled_event('Flash')
+        self.enclosure.mouth_reset()
+        self.enclosure.activate_mouth_events()
+        
+    
+    def _show_alarm_anim(self, dt):
+        # Animated confirmation of the alarm
+        self.enclosure.mouth_reset()
+
+        self._render_time(dt)
+        time.sleep(2)
+        self.enclosure.mouth_reset()
+
+        # Show an animation
+        # TODO: mouth_display_png() is choking images > 8x8
+        #       (likely on the enclosure side)
+        for i in range(1, 16):
+            png = join(abspath(dirname(__file__)),
+                       "anim",
+                       "Alarm-"+str(int(i))+"-1.png")
+            # self.enclosure.mouth_display_png(png, x=0, y=0, refresh=False,
+            #                                  invert=True)
+            png = join(abspath(dirname(__file__)),
+                       "anim",
+                       "Alarm-"+str(int(i))+"-2.png")
+            if i < 8:
+                self.enclosure.mouth_display_png(png, x=8, y=0, refresh=False,
+                                                 invert=True)
+            png = join(abspath(dirname(__file__)),
+                       "anim",
+                       "Alarm-"+str(int(i))+"-3.png")
+            self.enclosure.mouth_display_png(png, x=16, y=0, refresh=False,
+                                             invert=True)
+            png = join(abspath(dirname(__file__)),
+                       "anim",
+                       "Alarm-"+str(int(i))+"-4.png")
+            self.enclosure.mouth_display_png(png, x=24, y=0, refresh=False,
+                                             invert=True)
+
+            if i == 4:
+                time.sleep(1)
+            else:
+                time.sleep(0.15)
+        self.enclosure.mouth_reset()
+
+    def _render_time(self, datetime):
+        # Show the time in numbers "8:00 AM"
+        timestr = nice_time(datetime, speech=False, use_ampm=True,
+                            use_24hour=self.use_24hour)
+        x = 16 - ((len(timestr)*4) // 2)  # centers on display
+        if not self.use_24hour:
+            x += 1  # account for wider letters P and M, offset by the colon
+
+        # draw on the display
+        for ch in timestr:
+            if ch == ":":
+                png = "colon.png"
+                w = 2
+            elif ch == " ":
+                png = "blank.png"
+                w = 2
+            elif ch == 'A' or ch == 'P' or ch == 'M':
+                png = ch+".png"
+                w = 5
+            else:
+                png = ch+".png"
+                w = 4
+
+            png = join(abspath(dirname(__file__)), "anim", png)
+            self.enclosure.mouth_display_png(png, x=x, y=2, refresh=False)
+            x += w
 
 def create_skill():
     return AlarmSkill()
-
 
 ##########################################################################
 # TODO: Move to mycroft.util.format and support translation
