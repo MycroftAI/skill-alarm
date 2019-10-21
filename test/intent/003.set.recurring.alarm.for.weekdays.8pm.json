@@ -1,6 +1,0 @@
-{
-    "utterance": "set a recurring alarm",
-    "intent_type": "handle_set_alarm",
-    "responses": ["weekdays","8 pm"],
-    "expected_dialog": "recurring.alarm.scheduled.for.time"
-}

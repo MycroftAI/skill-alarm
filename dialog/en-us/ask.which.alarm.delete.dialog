@@ -1,2 +1,1 @@
-Which alarm do you wish to delete?
-Which alarm do you wish to stop?
+You have {number} alarms: {list}. Which alarm do you (wish|want) to (delete|stop)?
