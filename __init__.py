@@ -917,11 +917,13 @@ class AlarmSkill(MycroftSkill):
 
     def converse(self, utterances, lang="en-us"):
         if self.has_expired_alarm():
-            # An alarm is going off
             if utterances and self.voc_match(utterances[0], "StopBeeping"):
-                # Stop the alarm
                 self._stop_expired_alarm()
                 return True  # and consume this phrase
+
+    def stop(self, message=None):
+        if self.has_expired_alarm():
+            self._stop_expired_alarm()
 
     def _play_beep(self, message=None):
         """ Play alarm sound file """
