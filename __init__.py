@@ -160,8 +160,8 @@ class AlarmSkill(MycroftSkill):
             dump += "           Next: {} {}\n".format(nice_time(dt, speech=False, use_ampm=True),
                                                     nice_date(dt, now=now_local()))
             dump += "                 U{} L{}\n".format(dt, to_local(dt))
-            if len(alarm) >= 3:
-                dtOrig = self.get_alarm_local(timestamp=alarm[2])
+            if 'snooze' in alarm:
+                dtOrig = self.get_alarm_local(timestamp=alarm['snooze'])
                 dump += "           Orig: {} {}\n".format(nice_time(dtOrig, speech=False, use_ampm=True),
                                                         nice_date(dtOrig, now=now_local()))
             idx += 1
@@ -271,7 +271,7 @@ class AlarmSkill(MycroftSkill):
                 else:
                     # schedule for right now, with the
                     # third entry as the original base time
-                    base = alarm["name"] if len(alarm) == 3\
+                    base = alarm["name"] if alarm["name"] == ''\
                                          else alarm["timestamp"]
                     alarms.append({
                         "timestamp": now_ts+1,
@@ -287,7 +287,7 @@ class AlarmSkill(MycroftSkill):
 
     def _next_repeat(self, alarm):
         # evaluate recurrence to the next instance
-        if len(alarm) == 3:
+        if 'snooze' in alarm:
             # repeat from original time (it was snoozed)
             ref = datetime.fromtimestamp(alarm["repeat_rule"])
         else:
@@ -753,7 +753,7 @@ class AlarmSkill(MycroftSkill):
             return (status[4], [alarms[0]])
         
         # Given something to match but no match found
-        if (number and number > len(alarm)) or \
+        if (number and number > len(alarms)) or \
            (recur and not recurrence_matches) or \
            (when and not time_matches):
             return (status[2], None)
