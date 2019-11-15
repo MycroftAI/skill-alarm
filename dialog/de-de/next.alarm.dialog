@@ -1,2 +1,2 @@
-Dein nächster (Alarm|Wecker) ist um {when}, in {duration} ab jetzt
-Der nächste (Alarm|Wecker) ist für {when}, in {duration} ab jetzt
+(Der nächste |dein nächster) Alarm ist {when}, {duration} von jetzt an
+(Der nächste|dein nächster) Alarm ist für {when}, {duration} von jetzt an

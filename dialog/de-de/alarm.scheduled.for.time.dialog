@@ -1,2 +1,2 @@
-(Alarm|Wecker) gestellt für {{time}}, in {{rel}}
-Ich habe einen (Alarm|Wecker) für {{time}} erstellt, {{rel}} von jetzt
+Alarm (erstellt | eingestellt) für {{time}}, in {{rel}}
+Ich habe von jetzt an einen Alarm für {{time}}, {{rel}} (erstellt|gesetzt)

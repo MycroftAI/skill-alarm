@@ -1,2 +1,1 @@
-Welchen (Alarm|Wecker) möchtest du löschen?
-Welchen (Alarm|Wecker) möchtest du stoppen?
+Sie haben {number} Alarme: {list}. Welchen Alarm möchtest du (löschen | stoppen)?

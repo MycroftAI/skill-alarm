@@ -1,4 +1,9 @@
 Schlummer
-Schlummeralarm
-Schlummeralarm für {{time}} (Minuten|Stunden)
-Alarm pausieren
+Schlummer (den|) alarm
+Schlummeralarm (der |) für {{time}} (Sekunde (n) | Minute (n) | Stunde (n))
+Snooze für {{time}} (Sekunde(n)|Minute(n)|Stunde(n))
+pausiere (den|) alarm
+noch nicht
+gib mir {{time}} mehr (Sekunde(n)|Minute(n)|Stunde(n))
+wecke mich in {{time}} (Sekunde(n)|Minute(n)|Stunde(n))
+lass mich schlafen
