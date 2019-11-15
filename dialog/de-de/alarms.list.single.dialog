@@ -1,2 +1,2 @@
-Du hast einen (Alarm|Wecker) gestellt für {{item}}
-Ein (Alarm|Wecker) ist gestellt für {{item}}
+Du hast ab sofort einen Alarm für {{item}}, {duration} eingestellt
+Ab sofort ist ein Alarm für {{item}}, {duration} eingestellt
