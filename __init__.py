@@ -824,7 +824,7 @@ class AlarmSkill(MycroftSkill):
     @intent_handler(IntentBuilder("").require("Delete").require("Alarm").
                     optionally("Recurring").optionally("Recurrence"))
     def handle_delete(self, message):
-        if self.has_expired_alarm:
+        if self.has_expired_alarm():
             self._stop_expired_alarm()
             return
 
