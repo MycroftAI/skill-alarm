@@ -1,2 +1,2 @@
-Jag ställer ett larm {{time}}, verkar det stämma?
-Jag skapar ett nytt larm {{time}}, stämmer detta?
+Jag (ställer|skapar) ett larm för {{time}}, verkar det stämma?
+Jag (sätter|skapar) ett nytt larm för {{time}}, stämmer detta?

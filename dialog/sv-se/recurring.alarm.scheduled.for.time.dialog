@@ -1,2 +1,2 @@
-Larm inställt för {{time}}, med start om {{rel}}
-Jag har skapat ett larm för {{time}}, med start {{rel}} från nu
+Larm (skapad|inställt) för {{time}}, med start om {{rel}}
+Jag har (skapat|satt) ett larm för {{time}}, med start {{rel}} från nu 
