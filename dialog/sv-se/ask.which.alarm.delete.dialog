@@ -1,2 +1,1 @@
-Vilket larm vill du ta bort?
-Vilket larm vill du stoppa?
+Du har {number} larm: {list}. Vilket larm vill (du|ni) (ta bort|stoppa)?

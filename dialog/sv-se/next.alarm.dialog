@@ -1,2 +1,2 @@
-Ditt nästa larm är {when}, {duration} från nu
-Nästa larmet är {when}, {duration} från nu
+(Ditt|Din) nästa larm är {when}, {duration} från nu
+(Din|ditt) nästa larm är {when}, {duration} från nu
