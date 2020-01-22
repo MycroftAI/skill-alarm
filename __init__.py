@@ -849,10 +849,9 @@ class AlarmSkill(MycroftSkill):
         elif status in ['Next', 'All', 'Matched']:
             if self.ask_yesno('ask.cancel.alarm.plural',
                               data={"count": total}) == 'yes':
-                for a in alarms:
-                    del self.settings["alarm"]\
-                        [self.settings["alarm"].index(a)]
-                    self._schedule()
+                self.settings['alarm'] = [a for a in self.settings['alarm']
+                                          if a not in alarms]
+                self._schedule()
                 self.speak_dialog('alarm.cancelled.multi',
                                 data = {"count": total})
             return
