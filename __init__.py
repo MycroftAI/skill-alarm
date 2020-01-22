@@ -201,8 +201,9 @@ class AlarmSkill(MycroftSkill):
         return datetime.fromtimestamp(ts, default_timezone())
 
     def set_alarm(self, when, name=None, repeat=None):
+        time = when.replace(second=0, microsecond=0)
         if repeat:
-            alarm = self._create_recurring_alarm(when, repeat)
+            alarm = self._create_recurring_alarm(time, repeat)
             alarm = {
                 "timestamp": alarm["timestamp"],
                 "repeat_rule": alarm["repeat_rule"],
@@ -210,7 +211,7 @@ class AlarmSkill(MycroftSkill):
             }
         else:
             alarm = {
-                "timestamp": to_utc(when).timestamp(),
+                "timestamp": to_utc(time).timestamp(),
                 "repeat_rule": "",
                 "name": name or ""
             }
@@ -218,10 +219,10 @@ class AlarmSkill(MycroftSkill):
         for existing in self.settings["alarm"]:
             if alarm == existing:
                 self.speak_dialog("alarm.already.exists")
-                return
-
-        self.settings["alarm"].append(alarm)
-        self._schedule()
+                return None
+        else:
+            self.settings["alarm"].append(alarm)
+            self._schedule()
         return alarm
 
     def _schedule(self):
