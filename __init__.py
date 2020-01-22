@@ -524,7 +524,8 @@ class AlarmSkill(MycroftSkill):
                             name = res.group("Name").strip()
                             self.log.debug('Regex name extracted: '
                                            + name)
-                            if name and len(name.strip()) > 0:
+                            if (name and len(name.strip()) > 0 and
+                                name not in self.translate_list('invalid_names')):
                                 return name.lower()
                         except IndexError:
                             pass
