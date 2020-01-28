@@ -203,9 +203,8 @@ class AlarmSkill(MycroftSkill):
             if alarm == existing:
                 self.speak_dialog("alarm.already.exists")
                 return None
-        else:
-            self.settings["alarm"].append(alarm)
-            self._schedule()
+        self.settings["alarm"].append(alarm)
+        self._schedule()
         return alarm
 
     def _schedule(self):
@@ -498,7 +497,6 @@ class AlarmSkill(MycroftSkill):
         if utt and rx_file:
             patterns = []
             with open(rx_file) as f:
-                pass
                 patterns = [p.strip() for p in f.readlines()
                             if not p.strip().startswith('#')]
 
