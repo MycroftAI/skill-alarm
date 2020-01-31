@@ -894,6 +894,9 @@ class AlarmSkill(MycroftSkill):
     def stop(self, message=None):
         if self.has_expired_alarm():
             self._stop_expired_alarm()
+            return True  # Stop signal handled no need to listen
+        else:
+            return False
 
     def _play_beep(self, message=None):
         """ Play alarm sound file """
