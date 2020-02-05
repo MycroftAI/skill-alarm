@@ -396,9 +396,10 @@ class AlarmSkill(MycroftSkill):
         # specify to set an alarm on midnight. If it's confirmed that
         # it's for a day only, then get another response from the user
         # to clarify what time on that day the recurring alarm is.
-        is_midnight = self._check_if_utt_has_midnight(utt,
-                                                      when,
-                                                      self.threshold)
+        if when is not None:
+            is_midnight = self._check_if_utt_has_midnight(utt,
+                                                          when,
+                                                          self.threshold)
 
         if (when is None or when.time() == today.time()) and not is_midnight:
             r = self.get_response('query.for.when')
@@ -652,9 +653,10 @@ class AlarmSkill(MycroftSkill):
         # specify to set an alarm on midnight. If it's confirmed that
         # it's for a day only, then get another response from the user
         # to clarify what time on that day the recurring alarm is.
-        is_midnight = self._check_if_utt_has_midnight(utt,
-                                                      when,
-                                                      self.threshold)
+        if when is not None:
+            is_midnight = self._check_if_utt_has_midnight(utt,
+                                                          when,
+                                                          self.threshold)
 
         if when == today and not is_midnight:
             when = None
