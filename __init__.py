@@ -408,14 +408,16 @@ class AlarmSkill(MycroftSkill):
             when_temp = extract_datetime(r)
             if when_temp is not None:
                 when_temp = when_temp[0]
-                is_midnight = self._check_if_utt_has_midnight(r, when_temp,
-                                                              self.threshold)
-                when = datetime(tzinfo=when.tzinfo,
-                                year=when.year,
-                                month=when.month,
-                                day=when.day,
-                                hour=when_temp.hour,
-                                minute=when_temp.minute)
+                # TODO add check for midnight
+                # is_midnight = self._check_if_utt_has_midnight(r, when_temp,
+                #                                               self.threshold)
+                when = when_temp if when is None \
+                                 else datetime(tzinfo=when.tzinfo,
+                                               year=when.year,
+                                               month=when.month,
+                                               day=when.day,
+                                               hour=when_temp.hour,
+                                               minute=when_temp.minute)
             else:
                 when = None
 
