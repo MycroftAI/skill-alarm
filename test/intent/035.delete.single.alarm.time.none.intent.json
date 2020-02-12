@@ -1,0 +1,6 @@
+{
+    "utterance": "cancel my alarm",
+    "intent_type": "handle_delete",
+    "responses": ["yes"],
+    "expected_dialog": "alarm.cancelled.desc"
+}
