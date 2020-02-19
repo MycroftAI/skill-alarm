@@ -354,7 +354,7 @@ class AlarmSkill(MycroftSkill):
 
         return join_list(day_names, self.translate('and'))
 
-    @intent_handler(IntentBuilder("").optionally("Set").require("Alarm")
+    @intent_handler(IntentBuilder("").require("Set").require("Alarm")
                     .optionally("Recurring").optionally("Recurrence"))
     def handle_set_alarm(self, message):
         """Handler for "set an alarm for..."""
