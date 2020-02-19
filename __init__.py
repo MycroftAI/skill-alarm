@@ -379,13 +379,10 @@ class AlarmSkill(MycroftSkill):
                 return
 
         # Get the time
-        when, utt_no_datetime = extract_datetime(utt) or (None, None)
+        when, utt_no_datetime = extract_datetime(utt) or (None, utt)
 
         # Get name from leftover string from extract_datetime
-        if utt_no_datetime:
-            name = self._get_alarm_name(utt_no_datetime)
-        else:
-            name = ""
+        name = self._get_alarm_name(utt_no_datetime)
 
         # Will return dt of unmatched string
         today = extract_datetime("today")
