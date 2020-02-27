@@ -1,7 +1,8 @@
-Feature: Alarm
+Feature: Alarm skill functionality
 
   Scenario Outline: user sets an alarm for a time
     Given an english speaking user
+     And there are no previous alarms set
      When the user says "<set alarm for a 8 am>"
      Then "skill-alarm" should reply with dialog from "alarm.scheduled.for.time.dialog"
 
@@ -17,6 +18,7 @@ Feature: Alarm
 
   Scenario Outline: user sets an alarm without saying a time
     Given an english speaking user
+     And there are no previous alarms set
      When the user says "<set alarm>"
      Then "skill-alarm" should reply with dialog from "query.for.when.dialog"
      And the user replies "8:00 am"
@@ -33,6 +35,7 @@ Feature: Alarm
 
   Scenario Outline: user sets an alarm with a name with a time
     Given an english speaking user
+     And there are no previous alarms set
      When the user says "<set an alarm named sandwich for 12 pm>"
      Then "skill-alarm" should reply with dialog from "alarm.scheduled.for.time.dialog"
 
@@ -46,6 +49,7 @@ Feature: Alarm
 
   Scenario Outline: user sets an alarm without specifiying am or pm
     Given an english speaking user
+     And there are no previous alarms set
      When the user says "<set an alarm for 6:30>"
      Then "skill-alarm" should reply with dialog from "alarm.scheduled.for.time.dialog"
 
@@ -58,6 +62,7 @@ Feature: Alarm
 
   Scenario Outline: set an alarm for a duration instead of a time
     Given an english speaking user
+     And there are no previous alarms set
      When the user says "<set an alarm for 30 minutes>"
      Then "skill-alarm" should reply with dialog from "alarm.scheduled.for.time.dialog"
 
@@ -70,6 +75,7 @@ Feature: Alarm
 
   Scenario Outline: user sets a named alarm without saying a time
     Given an english speaking user
+     And there are no previous alarms set
      When the user says "<set an alarm for sandwich>"
      Then "skill-alarm" should reply with dialog from "query.for.when.dialog"
      And the user replies "8 am"
@@ -82,6 +88,7 @@ Feature: Alarm
 
   Scenario Outline: user sets a recurring alarm
     Given an english speaking user
+     And there are no previous alarms set
      When the user says "<set alarm every weekday at 7:30 am>"
      Then "skill-alarm" should reply with dialog from "recurring.alarm.scheduled.for.time.dialog"
 
@@ -96,6 +103,7 @@ Feature: Alarm
 
   Scenario Outline: user sets a recurring alarm without saying a time
     Given an english speaking user
+     And there are no previous alarms set
      When the user says "<set a recurring alarm for mondays>"
      Then "skill-alarm" should reply with dialog from "query.for.when.dialog"
      And the user says "<8 am>"
@@ -109,6 +117,7 @@ Feature: Alarm
 
   Scenario Outline: user sets a recurring alarm without saying a day
     Given an english speaking user
+     And there are no previous alarms set
      When the user says "<set a recurring alarm for 8 am>"
      Then "skill-alarm" should reply with dialog from "query.recurrence.dialog"
      And the user says "<weekdays>"
@@ -120,6 +129,7 @@ Feature: Alarm
 
   Scenario Outline: user sets recurring named alarm
     Given an english speaking user
+     And there are no previous alarms set
      When the user says "<set a recurring alarm named lunch for 1 pm>"
      Then "skill-alarm" should reply with dialog from "query.recurrence.dialog"
      And the user says "<every day>"
@@ -132,6 +142,7 @@ Feature: Alarm
 
   Scenario Outline: user asks for alarm status of a single alarm
     Given an english speaking user
+    And there are no previous alarms set
     And an alarm is set for 9:00 am on weekdays
     When the user says "<alarm status>"
     Then "skill-alarm" should reply with dialog from "alarms.list.single.dialog"
@@ -150,10 +161,11 @@ Feature: Alarm
 
   Scenario Outline: user asks for alarm status of multiple alarms
     Given an english speaking user
+     And there are no previous alarms set
      And an alarm is set for 9:00 am on weekdays
      And an alarm is set for 6:00 pm on wednesday
      When the user says "<alarm status>"
-     Then "skill-alarm" should reply with dialog from "alarms.list.single.dialog"
+     Then "skill-alarm" should reply with dialog from "alarms.list.multi.dialog"
 
   Examples: status of multiple alarms
     | alarm status |
@@ -169,8 +181,8 @@ Feature: Alarm
 
   Scenario Outline: user asks for alarm status when no alarms are sets
     Given an english speaking user
-     And a single alarm is set for 9:00 am on the next day
-     When the user says "<alarm status when no alarms are set>"
+     And there are no previous alarms set
+     When the user says "<alarm status>"
      Then "skill-alarm" should reply with dialog from "alarms.list.empty.dialog"
 
   Examples: status when no alarms are set
@@ -187,6 +199,7 @@ Feature: Alarm
 
   Scenario Outline: user stops an expired alarm when beeping
     Given an english speaking user
+     And there are no previous alarms set
      And an alarm is expired and beeping
      When the user says "<stop>"
      Then "skill-alarm" should stop beeping
@@ -206,6 +219,7 @@ Feature: Alarm
 
   Scenario Outline: user snoozes a beeping alarm
     Given an english speaking user
+     And there are no previous alarms set
      And an alarm is expired and beeping
      When the user says "<snooze>"
      Then "skill-alarm" should stop beeping and start beeping again 10 minutes
@@ -224,6 +238,7 @@ Feature: Alarm
 
   Scenario Outline: user snoozes an beeping alarm for a specific time
     Given an english speaking user
+     And there are no previous alarms set
      And an alarm is expired and beeping
      When the user says "<snooze for 5 minutes>"
      Then "skill-alarm" should stop beeping and start beeping again 5 minutes
@@ -234,6 +249,7 @@ Feature: Alarm
 
   Scenario Outline: user deletes an alarm when a single alarm is active
     Given an english speaking user
+     And there are no previous alarms set
      And an alarm is set for 9:00 am on monday
      When the user says "<delete alarm>"
      Then "skill-alarm" should reply with dialog from "ask.cancel.desc.alarm.dialog"
@@ -251,6 +267,7 @@ Feature: Alarm
 
   Scenario Outline: user deletes an alarm when multiple alarms are active
     Given an english speaking user
+     And there are no previous alarms set
      And an alarm is set for 9:00 am on monday
      And an alarm is set for 10:00 pm on friday
      When the user says "<delete alarm>"
@@ -271,32 +288,32 @@ Feature: Alarm
 
   Scenario Outline: user deletes a specific alarm
     Given an english speaking user
+     And there are no previous alarms set
      And an alarm is set for 9:00 am on monday
      And an alarm is set for 10:00 pm on friday
-     When the user says "<delete alarm>"
-     Then "skill-alarm" should reply with dialog from "ask.which.alarm.delete.dialog"
-     And the user says "9:00 am"
+     When the user says "<delete 9:00 am alarm>"
      And "skill-alarm" should reply with dialog from "ask.cancel.desc.alarm.dialog"
      And the user says "yes"
      And "skill-alarm" should reply with dialog from "alarm.cancelled.desc.dialog"
 
   Examples: delete an alarm when multiple alarm are active
-    | delete alarm |
-    | cancel alarm |
-    | disable alarm |
-    | turn off alarm |
-    | stop alarm |
-    | abort alarm |
-    | remove alarm |
+    | delete 9:00 am alarm |
+    | cancel 9:00 am alarm |
+    | disable 9:00 am alarm |
+    | turn off 9:00 am alarm |
+    | stop 9:00 am alarm |
+    | abort 9:00 am alarm |
+    | remove 9:00 am alarm |
 
   Scenario Outline: user deletes all alarms
     Given an english speaking user
-    And an alarm is set for 9:00 am on monday
-    And an alarm is set for 10:00 pm on friday
-    When the user says "<delete all alarms>"
-    Then "skill-alarm" should reply with dialog from "ask.cancel.alarm.plural.dialog"
-    And the user says "yes"
-    And "skill-alarm" should reply with dialog from "alarm.cancelled.multi.dialog"
+     And there are no previous alarms set
+     And an alarm is set for 9:00 am on monday
+     And an alarm is set for 10:00 pm on friday
+     When the user says "<delete all alarms>"
+     Then "skill-alarm" should reply with dialog from "ask.cancel.alarm.plural.dialog"
+     And the user says "yes"
+     And "skill-alarm" should reply with dialog from "alarm.cancelled.multi.dialog"
 
   Examples: delete an alarm when multiple alarm are active
     | delete all alarms |
