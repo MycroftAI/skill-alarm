@@ -398,7 +398,7 @@ class AlarmSkill(MycroftSkill):
                                                       self.threshold)
 
         if (when is None or when.time() == today.time()) and not is_midnight:
-            r = self.get_response('query.for.when')
+            r = self.get_response('query.for.when', validator=extract_datetime)
             if not r:
                 self.speak_dialog("alarm.schedule.cancelled")
                 return
