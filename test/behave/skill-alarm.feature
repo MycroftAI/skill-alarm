@@ -173,7 +173,6 @@ Feature: Alarm skill functionality
   Examples: set a recuring alarm without saying a time
     | set a recurring alarm without saying a time | time |
     | set a recurring alarm for mondays | 8 am |
-    | set a recurring alarm for mondays | 8 am |
     | set a recurring alarm for tuesday | 9 am |
     | create a repeating alarm for weekdays | 7 am |
 
