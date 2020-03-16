@@ -289,7 +289,7 @@ Feature: Alarm skill functionality
 
   Examples: status when no alarms are set
      | alarm status |
-     | alarmm status |
+     | alarm status |
      | do I have any alarms |
      | what alarms do I have |
      | show me my alarms |
