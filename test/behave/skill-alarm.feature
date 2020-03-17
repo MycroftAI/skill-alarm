@@ -59,6 +59,31 @@ Feature: Alarm skill functionality
     | alarm tonight |
     | alarm |
 
+  Scenario Outline: User sets an alarm without saying a time but then cancels
+    Given an english speaking user
+     And there are no previous alarms set
+     When the user says "<set an alarm without saying a time>"
+     Then "mycroft-alarm" should reply with dialog from "query.for.when.dialog"
+     And the user replies "<nevermind>"
+
+  Examples: set alarm withot saying a time
+    | set an alarm without saying a time | nevermind |
+    | set an alarm | nevermind |
+    | create an alarm | cancel |
+
+  @xfail
+  # Jira MS-109 https://mycroft.atlassian.net/browse/MS-109
+  Scenario Outline: User sets an alarm without saying a time but then cancels
+    Given an english speaking user
+     And there are no previous alarms set
+     When the user says "<set an alarm without saying a time>"
+     Then "mycroft-alarm" should reply with dialog from "query.for.when.dialog"
+     And the user replies "<nevermind>"
+
+  Examples: set alarm withot saying a time
+    | set an alarm without saying a time | nevermind |
+    | set an alarm | no |
+
   Scenario Outline: user sets an alarm with a name with a time
     Given an english speaking user
      And there are no previous alarms set
@@ -394,6 +419,23 @@ Feature: Alarm skill functionality
     | stop alarm |
     | abort alarm |
     | remove alarm |
+
+  Scenario Outline: user starts to delete a single alarm but then cancels
+    Given an english speaking user
+     And there are no previous alarms set
+     And an alarm is set for 9:00 am on monday
+     When the user says "<delete alarm>"
+     Then "mycroft-alarm" should reply with dialog from "ask.cancel.desc.alarm.dialog"
+     And the user says "no"
+     And "mycroft-alarm" should reply with dialog from "alarm.delete.cancelled.dialog"
+
+  Examples: user starts to delete a single alarm but then cancels
+    | no |
+    | no |
+    | nevermind |
+    | forget it |
+    | cancel |
+
 
   @xfail
   # Jira MS-74 https://mycroft.atlassian.net/browse/MS-74
