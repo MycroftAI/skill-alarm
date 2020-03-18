@@ -105,8 +105,6 @@ Feature: Alarm skill functionality
   Examples:
     | set an alarm for a duration |
     | set an alarm for 30 minutes |
-    | set an alarm 8 hours from now |
-    | set an alarm 8 hours and 30 minutes from now |
 
   @xfail
   Scenario Outline: Failing set an alarm for a duration instead of a time
@@ -120,6 +118,8 @@ Feature: Alarm skill functionality
     | set an alarm for 30 minutes |
     | alarm in 5 minutes |
     | alarm in 5 minutes and 30 seconds |
+    | set an alarm 8 hours from now |
+    | set an alarm 8 hours and 30 minutes from now |
 
   Scenario Outline: user sets a named alarm without saying a time
     Given an english speaking user
