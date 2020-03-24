@@ -67,7 +67,6 @@ class AlarmSkill(MycroftSkill):
     def __init__(self):
         super(AlarmSkill, self).__init__()
         self.beep_process = None
-        self.settings['max_alarm_secs'] = 10*60  # max time to beep: 10 min
         self.beep_start_time = None
         self.flash_state = 0
 
@@ -84,9 +83,8 @@ class AlarmSkill(MycroftSkill):
             "chimes":        22.0
         }
 
-        # default sound is 'constant_beep'
-        self.settings['sound'] = AlarmSkill.default_sound
-        self.settings['start_quiet'] = True
+        #initialize alarm settings
+        self.init_settings()
         try:
             self.mixer = Mixer()
         except Exception:
@@ -119,7 +117,14 @@ class AlarmSkill(MycroftSkill):
         #       be in the utc timezone.
         #
         # NOTE: Using list instead of tuple because of serialization
-        self.settings["alarm"] = []
+
+    def init_settings(self):
+        """Add any missing default settings."""
+        # default sound is 'constant_beep'
+        self.settings.setdefault('max_alarm_secs', 10 * 60)  # Beep for 10 min.
+        self.settings.setdefault('sound', AlarmSkill.default_sound)
+        self.settings.setdefault('start_quiet', True)
+        self.settings.setdefault('alarm', [])
 
     def dump_alarms(self, tag=""):
         # Useful when debugging
