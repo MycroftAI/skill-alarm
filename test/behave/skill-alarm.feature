@@ -96,16 +96,6 @@ Feature: Alarm skill functionality
     | set an alarm for a time without am or pm |
     | alarm for 12 |
 
-  Scenario Outline: set an alarm for a duration instead of a time
-    Given an english speaking user
-     And there are no previous alarms set
-     When the user says "<set an alarm for a duration>"
-     Then "mycroft-alarm" should reply with dialog from "alarm.scheduled.for.time.dialog"
-
-  Examples:
-    | set an alarm for a duration |
-    | set an alarm for 30 minutes |
-
   @xfail
   Scenario Outline: Failing set an alarm for a duration instead of a time
     Given an english speaking user
