@@ -353,7 +353,7 @@ class AlarmSkill(MycroftSkill):
         day_names = []
         for day in days.split(" "):
             for r in self.recurrence_dict:
-                if self.recurrence_dict[r] is day:
+                if self.recurrence_dict[r] == day:
                     day_names.append(r)
                     break
 
@@ -554,7 +554,7 @@ class AlarmSkill(MycroftSkill):
             dt = self.get_alarm_local(alarm)
 
             dialog = 'recurring.alarm'
-            if alarm["name"] is not "":
+            if alarm["name"] != "":
                 dialog = dialog + '.named'
             return self.translate(dialog,
                                   data={'time': nice_time(dt, use_ampm=True),
