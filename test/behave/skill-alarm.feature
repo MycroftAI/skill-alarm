@@ -16,6 +16,7 @@ Feature: Alarm skill functionality
     | wake me up at 7 tomorrow morning |
 
   @xfail
+  # MS-64 https://mycroft.atlassian.net/browse/MS-64
   Scenario Outline: user sets an alarm for a time
     Given an english speaking user
      And there are no previous alarms set
@@ -42,6 +43,7 @@ Feature: Alarm skill functionality
     | create an alarm |
 
   @xfail
+  # Jira MS-65 https://mycroft.atlassian.net/browse/MS-65
   Scenario Outline: Failing user sets an alarm without saying a time
     Given an english speaking user
      And there are no previous alarms set
@@ -56,6 +58,31 @@ Feature: Alarm skill functionality
     | wake me up tomorrow |
     | alarm tonight |
     | alarm |
+
+  Scenario Outline: User sets an alarm without saying a time but then cancels
+    Given an english speaking user
+     And there are no previous alarms set
+     When the user says "<set an alarm without saying a time>"
+     Then "mycroft-alarm" should reply with dialog from "query.for.when.dialog"
+     And the user replies "<nevermind>"
+
+  Examples: set alarm withot saying a time
+    | set an alarm without saying a time | nevermind |
+    | set an alarm | nevermind |
+    | create an alarm | cancel |
+
+  @xfail
+  # Jira MS-109 https://mycroft.atlassian.net/browse/MS-109
+  Scenario Outline: User sets an alarm without saying a time but then cancels
+    Given an english speaking user
+     And there are no previous alarms set
+     When the user says "<set an alarm without saying a time>"
+     Then "mycroft-alarm" should reply with dialog from "query.for.when.dialog"
+     And the user replies "<nevermind>"
+
+  Examples: set alarm withot saying a time
+    | set an alarm without saying a time | nevermind |
+    | set an alarm | no |
 
   Scenario Outline: user sets an alarm with a name with a time
     Given an english speaking user
@@ -86,6 +113,7 @@ Feature: Alarm skill functionality
     | let me know when it's 6 |
 
   @xfail
+  # Jira MS-66 https://mycroft.atlassian.net/browse/MS-66
   Scenario Outline: user sets an alarm without specifiying am or pm
     Given an english speaking user
      And there are no previous alarms set
@@ -97,6 +125,7 @@ Feature: Alarm skill functionality
     | alarm for 12 |
 
   @xfail
+  # Jira MS-67 https://mycroft.atlassian.net/browse/MS-67
   Scenario Outline: Failing set an alarm for a duration instead of a time
     Given an english speaking user
      And there are no previous alarms set
@@ -140,6 +169,7 @@ Feature: Alarm skill functionality
     | set an alarm for 3 pm every weekend |
 
   @xfail
+  # Jira 68 https://mycroft.atlassian.net/browse/MS-68
   Scenario Outline: Failing user sets a recurring alarm
     Given an english speaking user
      And there are no previous alarms set
@@ -222,6 +252,7 @@ Feature: Alarm skill functionality
     | when's my alarm |
 
   @xfail
+  # Jira 69 https://mycroft.atlassian.net/browse/MS-69
   Scenario Outline: Failing user asks for alarm status of a single alarm
     Given an english speaking user
     And there are no previous alarms set
@@ -255,6 +286,7 @@ Feature: Alarm skill functionality
     | when's my alarm |
 
   @xfail
+  # Jira 70 https://mycroft.atlassian.net/browse/MS-70
   Scenario Outline: Failing user asks for alarm status of multiple alarms
     Given an english speaking user
      And there are no previous alarms set
@@ -287,6 +319,7 @@ Feature: Alarm skill functionality
      | when's my alarm |
 
   @xfail
+  # Jira MS-71 https://mycroft.atlassian.net/browse/MS-71
   Scenario Outline: Failing user asks for alarm status when no alarms are sets
     Given an english speaking user
      And there are no previous alarms set
@@ -323,6 +356,7 @@ Feature: Alarm skill functionality
     | kill alarm |
 
   @xfail
+  # Jira MS-72 https://mycroft.atlassian.net/browse/MS-72
   Scenario Outline: user snoozes a beeping alarm
     Given an english speaking user
      And there are no previous alarms set
@@ -344,6 +378,7 @@ Feature: Alarm skill functionality
     | let me sleep |
 
   @xfail
+  # Jira MS-73 https://mycroft.atlassian.net/browse/MS-73
   Scenario Outline: user snoozes an beeping alarm for a specific time
     Given an english speaking user
      And there are no previous alarms set
@@ -375,7 +410,25 @@ Feature: Alarm skill functionality
     | abort alarm |
     | remove alarm |
 
+  Scenario Outline: user starts to delete a single alarm but then cancels
+    Given an english speaking user
+     And there are no previous alarms set
+     And an alarm is set for 9:00 am on monday
+     When the user says "<delete alarm>"
+     Then "mycroft-alarm" should reply with dialog from "ask.cancel.desc.alarm.dialog"
+     And the user says "no"
+     And "mycroft-alarm" should reply with dialog from "alarm.delete.cancelled.dialog"
+
+  Examples: user starts to delete a single alarm but then cancels
+    | no |
+    | no |
+    | nevermind |
+    | forget it |
+    | cancel |
+
+
   @xfail
+  # Jira MS-74 https://mycroft.atlassian.net/browse/MS-74
   Scenario Outline: user deletes an alarm when multiple alarms are active
     Given an english speaking user
      And there are no previous alarms set
@@ -399,6 +452,7 @@ Feature: Alarm skill functionality
     | remove alarm |
 
   @xfail
+  # Jira MS-75 https://mycroft.atlassian.net/browse/MS-75
   Scenario Outline: user deletes a specific alarm
     Given an english speaking user
      And there are no previous alarms set
@@ -440,6 +494,7 @@ Feature: Alarm skill functionality
     | remove all alarms |
 
   @xfail
+  # Jira MS-75 https://mycroft.atlassian.net/browse/MS-75
   Scenario Outline: Failing user deletes all alarms
     Given an english speaking user
      And there are no previous alarms set
