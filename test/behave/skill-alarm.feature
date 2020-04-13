@@ -414,9 +414,9 @@ Feature: Alarm skill functionality
     Given an english speaking user
      And there are no previous alarms set
      And an alarm is set for 9:00 am on monday
-     When the user says "<delete alarm>"
+     When the user says "delete alarm"
      Then "mycroft-alarm" should reply with dialog from "ask.cancel.desc.alarm.dialog"
-     And the user says "no"
+     And the user says "<no>"
      And "mycroft-alarm" should reply with dialog from "alarm.delete.cancelled.dialog"
 
   Examples: user starts to delete a single alarm but then cancels
