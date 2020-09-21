@@ -459,7 +459,8 @@ class AlarmSkill(MycroftSkill):
             if alarm_time_ts > now_ts:
                 alarm = self.set_alarm(alarm_time, name)
             else:
-                if ('today' in utt) or ('tonight' in utt):
+                if (self.translate('today') in utt 
+                    or self.translate('tonight') in utt):
                     self.speak_dialog('alarm.past')
                     return
                 else:
