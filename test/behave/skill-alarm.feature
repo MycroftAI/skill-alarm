@@ -492,20 +492,5 @@ Feature: Alarm skill functionality
     | stop all alarms |
     | abort all alarms |
     | remove all alarms |
-
-  @xfail
-  # Jira MS-75 https://mycroft.atlassian.net/browse/MS-75
-  Scenario Outline: Failing user deletes all alarms
-    Given an english speaking user
-     And there are no previous alarms set
-     And an alarm is set for 9:00 am on monday
-     And an alarm is set for 10:00 pm on friday
-     When the user says "<delete all alarms>"
-     Then "mycroft-alarm" should reply with dialog from "ask.cancel.alarm.plural.dialog"
-     And the user says "yes"
-     And "mycroft-alarm" should reply with dialog from "alarm.cancelled.multi.dialog"
-
-  Examples: delete an alarm when multiple alarm are active
-    | delete all alarms |
     | remove every alarm |
     | delete every alarm |
