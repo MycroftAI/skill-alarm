@@ -20,7 +20,7 @@ from alsaaudio import Mixer
 import re
 
 from adapt.intent import IntentBuilder
-from mycroft import MycroftSkill, intent_handler, intent_file_handler
+from mycroft import MycroftSkill, intent_handler
 from mycroft.configuration.config import LocalConf, USER_CONFIG
 from mycroft.messagebus.message import Message
 from mycroft.util import play_mp3
@@ -850,7 +850,7 @@ class AlarmSkill(MycroftSkill):
 
         return
 
-    @intent_file_handler('snooze.intent')
+    @intent_handler('snooze.intent')
     def snooze_alarm(self, message):
         if not self.has_expired_alarm():
             return
@@ -884,7 +884,7 @@ class AlarmSkill(MycroftSkill):
                                      }
         self._schedule()
 
-    @intent_file_handler('change.alarm.sound.intent')
+    @intent_handler('change.alarm.sound.intent')
     def handle_change_alarm(self, message):
         self.speak_dialog("alarm.change.sound")
 
