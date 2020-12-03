@@ -1,7 +1,7 @@
 löschen
 abbrechen
 deaktivieren
-stop
+(stop|stopp)
 töten
 # Einzelne Wörter, die den Alarm ausschalten
 ausschalten
