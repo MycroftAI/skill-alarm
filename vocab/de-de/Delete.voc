@@ -4,7 +4,7 @@ abbrechen
 aufräumen
 lösche
 deaktivieren
-stop
-abschalten
+(stop|stopp)
+(abschalten|ausschalten)
 abbrechen
 töten
