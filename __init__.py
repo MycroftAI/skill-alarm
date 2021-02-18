@@ -390,8 +390,7 @@ class AlarmSkill(MycroftSkill):
         name = self._get_alarm_name(utt_no_datetime)
 
         # Will return dt of unmatched string
-        today = extract_datetime("today")
-        today = today[0]
+        today = extract_datetime("today", lang="en-us")[0]
 
         # Check the time if it's midnight. This is to check if the user
         # said a recurring alarm with only the Day or if the user did
@@ -460,7 +459,8 @@ class AlarmSkill(MycroftSkill):
             if alarm_time_ts > now_ts:
                 alarm = self.set_alarm(alarm_time, name)
             else:
-                if ('today' in utt) or ('tonight' in utt):
+                if (self.translate('today') in utt 
+                    or self.translate('tonight') in utt):
                     self.speak_dialog('alarm.past')
                     return
                 else:
@@ -650,8 +650,7 @@ class AlarmSkill(MycroftSkill):
         when, utt_no_datetime = extract_datetime(utt) or (None, None)
 
         # Will return dt of unmatched string
-        today = extract_datetime("today")
-        today = today[0]
+        today = extract_datetime("today", lang="en-us")[0]
 
         # Check the time if it's midnight. This is to check if the user
         # said a recurring alarm with only the Day or if the user did
