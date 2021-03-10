@@ -26,12 +26,12 @@ from mycroft.messagebus.message import Message
 from mycroft.util import play_mp3
 from mycroft.util.format import nice_date_time, nice_time, nice_date, join_list
 from mycroft.util.parse import fuzzy_match, extract_datetime, extract_number
-from dateutil.rrule import rrulestr
 from mycroft.util.time import to_utc, default_timezone, to_local, now_local, now_utc
 
 from mycroft.util.time import to_system
 
-from .util import nice_relative_time
+from .util.alarm import create_recurring_rule, get_next_repeat
+from .util.format import nice_relative_time
 
 
 # WORKING PHRASES/SEQUENCES:
@@ -197,7 +197,7 @@ class AlarmSkill(MycroftSkill):
     def set_alarm(self, when, name=None, repeat=None):
         requested_time = when.replace(second=0, microsecond=0)
         if repeat:
-            alarm = self._create_recurring_alarm(requested_time, repeat)
+            alarm = create_recurring_rule(requested_time, repeat)
             alarm = {
                 "timestamp": alarm["timestamp"],
                 "repeat_rule": alarm["repeat_rule"],
@@ -243,7 +243,7 @@ class AlarmSkill(MycroftSkill):
                     # skip playing an old alarm
                     if alarm["repeat_rule"]:
                         # reschedule in future if repeat rule exists
-                        alarms.append(self._next_repeat(alarm))
+                        alarms.append(get_next_repeat(alarm))
                 else:
                     # schedule for right now, with the
                     # third entry as the original base time
@@ -261,62 +261,6 @@ class AlarmSkill(MycroftSkill):
 
         alarms = sorted(alarms, key=lambda a: a["timestamp"])
         self.settings["alarm"] = alarms
-
-    def _next_repeat(self, alarm):
-        # evaluate recurrence to the next instance
-        if "snooze" in alarm:
-            # repeat from original time (it was snoozed)
-            ref = datetime.fromtimestamp(alarm["repeat_rule"])
-        else:
-            ref = datetime.fromtimestamp(alarm["timestamp"])
-
-        # Create a repeat rule and get the next alarm occurrance after that
-        start = to_utc(ref)
-        rr = rrulestr("RRULE:" + alarm["repeat_rule"], dtstart=start)
-        now = to_utc(now_utc())
-        next_occurence = rr.after(now)
-
-        self.log.debug("     Now={}".format(now))
-        self.log.debug("Original={}".format(start))
-        self.log.debug("    Next={}".format(next_occurence))
-
-        return {
-            "timestamp": to_utc(next_occurence).timestamp(),
-            "repeat_rule": alarm["repeat_rule"],
-            "name": alarm["name"],
-        }
-
-    def _create_recurring_alarm(self, when, recur):
-        # 'recur' is a set of day index strings, e.g. {"3", "4"}
-        # convert rule into an iCal rrule
-        # TODO: Support more complex alarms, e.g. first monday, monthly, etc
-        rule = ""
-        abbr = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"]
-        days = []
-        for day in recur:
-            days.append(abbr[int(day)])
-        if days:
-            rule = "FREQ=WEEKLY;INTERVAL=1;BYDAY=" + ",".join(days)
-
-        if when and rule:
-            when = to_utc(when)
-
-            # Create a repeating rule that starts in the past, enough days
-            # back that it encompasses any repeat.
-            past = when + timedelta(days=-45)
-            rr = rrulestr("RRULE:" + rule, dtstart=past)
-            now = to_utc(now_utc())
-            # Get the first repeat that happens after right now
-            next_occurence = rr.after(now)
-            return {
-                "timestamp": to_utc(next_occurence).timestamp(),
-                "repeat_rule": rule,
-            }
-        else:
-            return {
-                "timestamp": None,
-                "repeat_rule": rule,
-            }
 
     def has_expired_alarm(self):
         # True is an alarm should be 'going off' now.  Snoozed alarms don't
@@ -712,7 +656,7 @@ class AlarmSkill(MycroftSkill):
             is_match = self._fuzzy_match(word, utt.lower(), self.threshold)
             if is_match:
                 recur = self._create_day_set(utt)
-                alarm_recur = self._create_recurring_alarm(when, recur)
+                alarm_recur = create_recurring_rule(when, recur)
                 recurrence_matches = [
                     a for a in alarms if a["repeat_rule"] == alarm_recur["repeat_rule"]
                 ]
