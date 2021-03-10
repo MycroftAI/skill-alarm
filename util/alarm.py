@@ -12,52 +12,48 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from dateutil.rrule import rrulestr
 
 from mycroft.util import LOG
-from mycroft.util.time import to_utc, now_utc
+from mycroft.util.format import nice_time, nice_date
+from mycroft.util.time import default_timezone, now_local, now_utc, to_local, to_utc
 
 
-def create_recurring_rule(when, recur):
-    """Create a recurring iCal rrule for an alarm.
+def alarm_log_dump(alarms, tag=""):
+    """Create a log dump of all alarms. Useful when debugging."""
+    dump = "\n" + "=" * 30 + " ALARMS " + tag + " " + "=" * 30 + "\n"
+    dump += "raw = " + str(alarms) + "\n\n"
 
-    Arguments:
-        recur (set): day index strings, e.g. {"3", "4"}
-    Returns:
-        {
-            "timestamp" (datetime.timestamp): next occurence of alarm,
-            "repeat_rule" (rrule): iCal repeat rule
-        }
-    # TODO: Support more complex alarms, e.g. first monday, monthly, etc
-    """
-    rule = ""
-    abbr = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"]
-    days = []
-    for day in recur:
-        days.append(abbr[int(day)])
-    if days:
-        rule = "FREQ=WEEKLY;INTERVAL=1;BYDAY=" + ",".join(days)
+    now_ts = to_utc(now_utc()).timestamp()
+    dt = datetime.fromtimestamp(now_ts)
+    dump += "now = {} ({})\n".format(
+        nice_time(get_alarm_local(timestamp=now_ts), speech=False, use_ampm=True),
+        now_ts,
+    )
+    dump += "      U{} L{}\n".format(to_utc(dt), to_local(dt))
+    dump += "\n\n"
 
-    if when and rule:
-        when = to_utc(when)
+    idx = 0
+    for alarm in alarms:
+        dt = get_alarm_local(alarm)
+        dump += "alarm[{}] - {} \n".format(idx, alarm)
+        dump += "           Next: {} {}\n".format(
+            nice_time(dt, speech=False, use_ampm=True),
+            nice_date(dt, now=now_local()),
+        )
+        dump += "                 U{} L{}\n".format(dt, to_local(dt))
+        if "snooze" in alarm:
+            dtOrig = get_alarm_local(timestamp=alarm["snooze"])
+            dump += "           Orig: {} {}\n".format(
+                nice_time(dtOrig, speech=False, use_ampm=True),
+                nice_date(dtOrig, now=now_local()),
+            )
+        idx += 1
 
-        # Create a repeating rule that starts in the past, enough days
-        # back that it encompasses any repeat.
-        past = when + timedelta(days=-45)
-        repeat_rule = rrulestr("RRULE:" + rule, dtstart=past)
-        now = to_utc(now_utc())
-        # Get the first repeat that happens after right now
-        next_occurence = repeat_rule.after(now)
-        return {
-            "timestamp": to_utc(next_occurence).timestamp(),
-            "repeat_rule": rule,
-        }
-    else:
-        return {
-            "timestamp": None,
-            "repeat_rule": rule,
-        }
+    dump += "=" * 75
+
+    return dump
 
 def curate_alarms(alarms, curation_limit=1):
     """Clean a list of alarms including rescheduling repeating alarms.
@@ -98,6 +94,24 @@ def curate_alarms(alarms, curation_limit=1):
     curated_alarms = sorted(curated_alarms, key=lambda a: a["timestamp"])
     return curated_alarms
 
+def get_alarm_local(alarm=None, timestamp=None):
+    """Get the local time of an Alarm or timestamp.
+
+    Arguments:
+        alarm (Alarm): single instance of an Alarm
+        timestamp (datetime.timestamp): 
+    Returns:
+        datetime.timestamp
+    """
+    # TODO should this be two separate functions?
+    if alarm is None and timestamp is None:
+        return None
+    if timestamp:
+        ts = timestamp
+    else:
+        ts = alarm["timestamp"]
+    
+    return datetime.fromtimestamp(ts, default_timezone())
 
 def get_next_repeat(alarm):
     """Get the next occurence of a repeating alarm.
@@ -133,3 +147,22 @@ def get_next_repeat(alarm):
         "repeat_rule": alarm["repeat_rule"],
         "name": alarm["name"],
     }
+
+def has_expired_alarm(alarms):
+    """Check if list of alarms includes one that is currently expired.
+    
+    Arguments:
+        alarms (List): list of Alarms
+    Returns:
+        Bool: True if an alarm should be 'going off' now.  
+              Snoozed alarms don't count until they are triggered again.
+    """
+    if len(alarms) < 1:
+        return False
+
+    now_ts = to_utc(now_utc()).timestamp()
+    for alarm in alarms:
+        if alarm["timestamp"] <= now_ts:
+            return True
+
+    return False
