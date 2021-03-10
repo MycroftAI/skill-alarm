@@ -366,7 +366,7 @@ class AlarmSkill(MycroftSkill):
                 if res:
                     try:
                         name = res.group("Name").strip()
-                        self.log.debug("Regex name extracted: ".format(name))
+                        self.log.debug("Regex name extracted: {}".format(name))
                         if name and len(name.strip()) > 0 and name not in invalid_names:
                             return name.lower()
                     except IndexError:
