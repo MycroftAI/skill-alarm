@@ -193,9 +193,9 @@ class AlarmSkill(MycroftSkill):
         return datetime.fromtimestamp(ts, default_timezone())
 
     def set_alarm(self, when, name=None, repeat=None):
-        time = when.replace(second=0, microsecond=0)
+        requested_time = when.replace(second=0, microsecond=0)
         if repeat:
-            alarm = self._create_recurring_alarm(time, repeat)
+            alarm = self._create_recurring_alarm(requested_time, repeat)
             alarm = {
                 "timestamp": alarm["timestamp"],
                 "repeat_rule": alarm["repeat_rule"],
@@ -203,7 +203,7 @@ class AlarmSkill(MycroftSkill):
             }
         else:
             alarm = {
-                "timestamp": to_utc(time).timestamp(),
+                "timestamp": to_utc(requested_time).timestamp(),
                 "repeat_rule": "",
                 "name": name or "",
             }
@@ -272,14 +272,14 @@ class AlarmSkill(MycroftSkill):
         start = to_utc(ref)
         rr = rrulestr("RRULE:" + alarm["repeat_rule"], dtstart=start)
         now = to_utc(now_utc())
-        next = rr.after(now)
+        next_occurence = rr.after(now)
 
         self.log.debug("     Now={}".format(now))
         self.log.debug("Original={}".format(start))
-        self.log.debug("    Next={}".format(next))
+        self.log.debug("    Next={}".format(next_occurence))
 
         return {
-            "timestamp": to_utc(next).timestamp(),
+            "timestamp": to_utc(next_occurence).timestamp(),
             "repeat_rule": alarm["repeat_rule"],
             "name": alarm["name"],
         }
@@ -305,9 +305,9 @@ class AlarmSkill(MycroftSkill):
             rr = rrulestr("RRULE:" + rule, dtstart=past)
             now = to_utc(now_utc())
             # Get the first repeat that happens after right now
-            next = rr.after(now)
+            next_occurence = rr.after(now)
             return {
-                "timestamp": to_utc(next).timestamp(),
+                "timestamp": to_utc(next_occurence).timestamp(),
                 "repeat_rule": rule,
             }
         else:
@@ -606,7 +606,7 @@ class AlarmSkill(MycroftSkill):
 
         utt = message.data.get("utterance")
 
-        if not len(self.settings["alarm"]):
+        if len(self.settings["alarm"]) == 0:
             self.speak_dialog("alarms.list.empty")
             return
 
