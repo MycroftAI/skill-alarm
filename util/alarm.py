@@ -59,6 +59,45 @@ def create_recurring_rule(when, recur):
             "repeat_rule": rule,
         }
 
+def curate_alarms(alarms, curation_limit=1):
+    """Clean a list of alarms including rescheduling repeating alarms.
+
+    Arguments:
+        alarms (List): list of Alarms
+        curation_limit (int, optional): Seconds past expired at which to 
+                                        remove the alarm
+    Returns:
+        List: cleaned list of Alarms
+    """
+    curated_alarms = []
+    now_ts = to_utc(now_utc()).timestamp()
+
+    for alarm in alarms:
+        # Alarm format == [timestamp, repeat_rule[, orig_alarm_timestamp]]
+        if alarm["timestamp"] < now_ts:
+            if alarm["timestamp"] < (now_ts - curation_limit):
+                # skip playing an old alarm
+                if alarm["repeat_rule"]:
+                    # reschedule in future if repeat rule exists
+                    curated_alarms.append(get_next_repeat(alarm))
+            else:
+                # schedule for right now, with the
+                # third entry as the original base time
+                base = alarm["name"] if alarm["name"] == "" else alarm["timestamp"]
+                curated_alarms.append(
+                    {
+                        "timestamp": now_ts + 1,
+                        "repeat_rule": alarm["repeat_rule"],
+                        "name": alarm["name"],
+                        "snooze": base,
+                    }
+                )
+        else:
+            curated_alarms.append(alarm)
+
+    curated_alarms = sorted(curated_alarms, key=lambda a: a["timestamp"])
+    return curated_alarms
+
 
 def get_next_repeat(alarm):
     """Get the next occurence of a repeating alarm.

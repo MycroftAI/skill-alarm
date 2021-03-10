@@ -30,7 +30,7 @@ from mycroft.util.time import to_utc, default_timezone, to_local, now_local, now
 
 from mycroft.util.time import to_system
 
-from .util.alarm import create_recurring_rule, get_next_repeat
+from .util.alarm import create_recurring_rule, curate_alarms, get_next_repeat
 from .util.format import nice_relative_time
 
 
@@ -175,7 +175,7 @@ class AlarmSkill(MycroftSkill):
 
         # This will reschedule alarms which have expired within the last
         # 5 minutes, and cull anything older.
-        self._curate_alarms(5 * 60)
+        self.settings["alarm"] = curate_alarms(self.settings["alarm"], 5 * 60)
 
         self._schedule()
 
@@ -221,46 +221,12 @@ class AlarmSkill(MycroftSkill):
     def _schedule(self):
         # cancel any existing timed event
         self.cancel_scheduled_event("NextAlarm")
-        self._curate_alarms()
+        self.settings["alarm"] = curate_alarms(self.settings["alarm"])
 
         # set timed event for next alarm (if it exists)
         if self.settings["alarm"]:
             dt = self.get_alarm_local(self.settings["alarm"][0])
             self.schedule_event(self._alarm_expired, to_system(dt), name="NextAlarm")
-
-    def _curate_alarms(self, curation_limit=1):
-        """[summary]
-        curation_limit (int, optional): Seconds past expired at which to
-                                        remove the alarm
-        """
-        alarms = []
-        now_ts = to_utc(now_utc()).timestamp()
-
-        for alarm in self.settings["alarm"]:
-            # Alarm format == [timestamp, repeat_rule[, orig_alarm_timestamp]]
-            if alarm["timestamp"] < now_ts:
-                if alarm["timestamp"] < (now_ts - curation_limit):
-                    # skip playing an old alarm
-                    if alarm["repeat_rule"]:
-                        # reschedule in future if repeat rule exists
-                        alarms.append(get_next_repeat(alarm))
-                else:
-                    # schedule for right now, with the
-                    # third entry as the original base time
-                    base = alarm["name"] if alarm["name"] == "" else alarm["timestamp"]
-                    alarms.append(
-                        {
-                            "timestamp": now_ts + 1,
-                            "repeat_rule": alarm["repeat_rule"],
-                            "name": alarm["name"],
-                            "snooze": base,
-                        }
-                    )
-            else:
-                alarms.append(alarm)
-
-        alarms = sorted(alarms, key=lambda a: a["timestamp"])
-        self.settings["alarm"] = alarms
 
     def has_expired_alarm(self):
         # True is an alarm should be 'going off' now.  Snoozed alarms don't
@@ -1007,7 +973,7 @@ class AlarmSkill(MycroftSkill):
             self.__end_flash()
             self.cancel_scheduled_event("NextAlarm")
 
-            self._curate_alarms(0)  # end any expired alarm
+            self.settings["alarm"] = curate_alarms(self.settings["alarm"], 0)  # end any expired alarm
             self._schedule()
             return True
         else:
