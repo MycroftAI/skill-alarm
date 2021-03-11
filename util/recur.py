@@ -20,6 +20,15 @@ from mycroft.util.time import now_utc, to_utc
 
 
 def create_day_set(phrase, recurrence_dict):
+    """Create a Set of recurrence days from utterance.
+
+    Arguments:
+        phrase (Str): user utterance
+        recurrence_dict (Dict): map of strings to recurrence patterns
+
+    Returns:
+        Set: days as integers
+    """
     recur = set()
     for r in recurrence_dict:
         if r in phrase:
@@ -27,10 +36,12 @@ def create_day_set(phrase, recurrence_dict):
                 recur.add(day)
     return recur
 
+
 def create_recurring_rule(when, recur):
     """Create a recurring iCal rrule.
 
     Arguments:
+        when (datetime): datetime object of alarm
         recur (set): day index strings, e.g. {"3", "4"}
     Returns:
         {
@@ -67,8 +78,18 @@ def create_recurring_rule(when, recur):
             "repeat_rule": rule,
         }
 
+
 def describe_recurrence(recur, recurrence_dict, connective="and"):
-    # Create a textual description of the recur set
+    """Create a textual description of the recur set.
+
+    Arguments:
+        recur (Set): recurrence pattern as set of day indices eg Set(["1","3"])
+        recurrence_dict (Dict): map of strings to recurrence patterns
+        connective (Str): word to connect list of days, default "and"
+
+    Returns:
+        Str: List of days as a human understandable string
+    """
     day_list = list(recur)
     day_list.sort()
     days = " ".join(day_list)
@@ -85,4 +106,3 @@ def describe_recurrence(recur, recurrence_dict, connective="and"):
                 break
 
     return join_list(day_names, connective)
-        
