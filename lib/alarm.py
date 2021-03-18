@@ -110,7 +110,7 @@ def get_alarm_local(alarm=None, timestamp=None):
         ts = timestamp
     else:
         ts = alarm["timestamp"]
-    
+
     return datetime.fromtimestamp(ts, default_timezone())
 
 def get_next_repeat(alarm):
@@ -154,7 +154,7 @@ def has_expired_alarm(alarms):
     Arguments:
         alarms (List): list of Alarms
     Returns:
-        Bool: True if an alarm should be 'going off' now.  
+        Bool: True if an alarm should be 'going off' now.
               Snoozed alarms don't count until they are triggered again.
     """
     if len(alarms) < 1:

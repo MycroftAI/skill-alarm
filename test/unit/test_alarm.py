@@ -20,7 +20,7 @@ from mycroft.util.parse import extract_datetime
 from mycroft.util.time import now_local, now_utc, to_local, to_utc
 from lingua_franca import set_default_lang
 
-from ..alarm import (
+from lib.alarm import (
     alarm_log_dump,
     curate_alarms,
     get_alarm_local,
@@ -35,8 +35,8 @@ RRULE_WEEKDAYS = "FREQ=WEEKLY;INTERVAL=1;BYDAY=WE,MO,FR,TH,TU"
 
 
 def _get_timestamp(when):
-    dt, _ = extract_datetime(when) or (None, None)
-    return dt.timestamp()
+    extracted_dt, _ = extract_datetime(when) or (None, None)
+    return extracted_dt.timestamp()
 
 
 class TestCurateAlarms(unittest.TestCase):
@@ -86,15 +86,15 @@ class TestGetAlarmLocal(unittest.TestCase):
     def test_get_local_time_of_alarm(self):
         alarm_dt = _get_timestamp("tomorrow at 7pm")
         alarm = {"timestamp": alarm_dt, "repeat_rule": None, "name": ""}
-        dt = get_alarm_local(alarm)
+        alarm_local_dt = get_alarm_local(alarm)
         expected_dt = to_local(extract_datetime("tomorrow at 7pm")[0])
-        self.assertEqual(dt, expected_dt)
+        self.assertEqual(alarm_local_dt, expected_dt)
 
     def test_get_local_time_of_timestamp(self):
         timestamp = _get_timestamp("tomorrow at 7pm")
-        dt = get_alarm_local(timestamp=timestamp)
+        alarm_local_dt = get_alarm_local(timestamp=timestamp)
         expected_dt = to_local(extract_datetime("tomorrow at 7pm")[0])
-        self.assertEqual(dt, expected_dt)
+        self.assertEqual(alarm_local_dt, expected_dt)
 
 
 class TestGetNextRepeat(unittest.TestCase):

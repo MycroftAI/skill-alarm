@@ -12,15 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
 import unittest
-from datetime import datetime
 
 from lingua_franca import set_default_lang
 from mycroft.util.parse import extract_datetime
-from mycroft.util.time import now_local
 
-from ..recur import (
+from lib.recur import (
     create_day_set,
     create_recurring_rule,
     describe_recurrence,
@@ -77,6 +74,9 @@ class TestDescribeRecurrence(unittest.TestCase):
 class TestDescribeRepeatRule(unittest.TestCase):
     def test_describe_repeat_rule(self):
         daily_description = describe_repeat_rule(RRULE_DAILY, RECURRENCE_DICT)
-        self.assertEqual(daily_description, "sundays, mondays, tuesdays, wednesdays, thursdays, fridays and saturdays")
+        self.assertEqual(
+            daily_description,
+            "sundays, mondays, tuesdays, wednesdays, thursdays, fridays and saturdays",
+        )
         weekday_description = describe_repeat_rule(RRULE_WEEKDAYS, RECURRENCE_DICT)
         self.assertEqual(weekday_description, "weekdays")
