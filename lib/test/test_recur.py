@@ -20,7 +20,12 @@ from lingua_franca import set_default_lang
 from mycroft.util.parse import extract_datetime
 from mycroft.util.time import now_local
 
-from ..recur import create_day_set, create_recurring_rule, describe_recurrence
+from ..recur import (
+    create_day_set,
+    create_recurring_rule,
+    describe_recurrence,
+    describe_repeat_rule,
+)
 
 set_default_lang("en-us")
 
@@ -35,6 +40,9 @@ RECURRENCE_DICT = {
     "sundays": "0",
     "weekdays": "1 2 3 4 5",
 }
+RRULE_DAILY = "FREQ=WEEKLY;INTERVAL=1;BYDAY=SU,SA,WE,MO,FR,TH,TU"
+RRULE_MONDAYS = "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO"
+RRULE_WEEKDAYS = "FREQ=WEEKLY;INTERVAL=1;BYDAY=WE,MO,FR,TH,TU"
 
 
 class TestCreateDaySet(unittest.TestCase):
@@ -48,25 +56,27 @@ class TestCreateDaySet(unittest.TestCase):
 
 
 class TestCreateRecurringRule(unittest.TestCase):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.RRULE_DAILY = "FREQ=WEEKLY;INTERVAL=1;BYDAY=SU,SA,WE,MO,FR,TH,TU"
-        self.RRULE_MONDAYS = "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO"
-        self.RRULE_WEEKDAYS = "FREQ=WEEKLY;INTERVAL=1;BYDAY=WE,MO,FR,TH,TU"
-
     def test_create_recurring_rule(self):
         rrule = create_recurring_rule(extract_datetime("last monday")[0], set("1"))
         self.assertEqual(
             rrule,
             {
                 "timestamp": extract_datetime("monday")[0].timestamp(),
-                "repeat_rule": self.RRULE_MONDAYS,
+                "repeat_rule": RRULE_MONDAYS,
             },
         )
 
 
 class TestDescribeRecurrence(unittest.TestCase):
-    def test_create_describe_recurrence(self):
+    def test_describe_recurrence(self):
         recur_mon_wed = set(["1", "3"])
         description = describe_recurrence(recur_mon_wed, RECURRENCE_DICT)
         self.assertEqual(description, "mondays and wednesdays")
+
+
+class TestDescribeRepeatRule(unittest.TestCase):
+    def test_describe_repeat_rule(self):
+        daily_description = describe_repeat_rule(RRULE_DAILY, RECURRENCE_DICT)
+        self.assertEqual(daily_description, "sundays, mondays, tuesdays, wednesdays, thursdays, fridays and saturdays")
+        weekday_description = describe_repeat_rule(RRULE_WEEKDAYS, RECURRENCE_DICT)
+        self.assertEqual(weekday_description, "weekdays")

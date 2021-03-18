@@ -39,7 +39,12 @@ from .lib.alarm import (
 )
 from .lib.format import nice_relative_time
 from .lib.parse import fuzzy_match, utterance_has_midnight
-from .lib.recur import create_day_set, create_recurring_rule, describe_recurrence
+from .lib.recur import (
+    create_day_set,
+    create_recurring_rule,
+    describe_recurrence,
+    describe_repeat_rule,
+)
 
 
 # WORKING PHRASES/SEQUENCES:
@@ -201,6 +206,57 @@ class AlarmSkill(MycroftSkill):
                 self._alarm_expired, to_system(alarm_dt), name="NextAlarm"
             )
 
+    def _get_recurrence(self, utterance: str):
+        """Get recurrence pattern from user utterance."""
+        recur = create_day_set(utterance, self.recurrence_dict)
+        while not recur:
+            response = self.get_response("query.recurrence", num_retries=1)
+            if not response:
+                return
+            recur = create_day_set(response, self.recurrence_dict)
+
+        # TODO: remove days following an "except" in the utt
+        if self.voc_match(utterance, "Except"):
+            # TODO: Support exceptions
+            self.speak_dialog("no.exceptions.yet")
+            return
+
+        return recur
+
+    def _verify_alarm_time(self, when, today, recur):
+        """Verify time when creating an alarm."""
+        alarm_time = when
+        confirmed_time = False
+        while (not when or when == today) and not confirmed_time:
+            if recur:
+                alarm_nice_time = nice_time(alarm_time, use_ampm=True)
+                recur_description = describe_recurrence(
+                    recur, self.recurrence_dict, self.translate("and")
+                )
+                conf = self.ask_yesno(
+                    "confirm.recurring.alarm",
+                    data={"time": alarm_nice_time, "recurrence": recur_description},
+                )
+            else:
+                alarm_nice_dt = nice_date_time(alarm_time, now=today, use_ampm=True)
+                conf = self.ask_yesno("confirm.alarm", data={"time": alarm_nice_dt})
+            if not conf:
+                return
+            if conf == "yes":
+                when = [alarm_time]
+                confirmed_time = True
+            else:
+                # check if a new (corrected) time was given
+                when = extract_datetime(conf)
+                if when is not None:
+                    when = when[0]
+                if not when or when == today:
+                    # Not a confirmation and no date/time in statement, quit
+                    return
+                alarm_time = when
+                when = None  # reverify
+        return alarm_time, confirmed_time
+
     # Wake me on ... (hard to match with Adapt entities)
     @intent_handler(
         IntentBuilder("")
@@ -227,19 +283,7 @@ class AlarmSkill(MycroftSkill):
         if message.data.get("Recurring"):
             # Just ignoring the 'Recurrence' now, we support more complex stuff
             # recurrence = message.data.get('Recurrence')
-            recur = create_day_set(utt, self.recurrence_dict)
-            # TODO: remove days following an "except" in the utt
-
-            while not recur:
-                response = self.get_response("query.recurrence", num_retries=1)
-                if not response:
-                    return
-                recur = create_day_set(response, self.recurrence_dict)
-
-            if self.voc_match(utt, "Except"):
-                # TODO: Support exceptions
-                self.speak_dialog("no.exceptions.yet")
-                return
+            recur = self._get_recurrence(utt)
 
         # Get the time
         when, utt_no_datetime = extract_datetime(utt) or (None, utt)
@@ -285,37 +329,10 @@ class AlarmSkill(MycroftSkill):
             else:
                 when = None
 
-        # Verify time
-        alarm_time = when
-        confirmed_time = False
-        while (not when or when == today) and not confirmed_time:
-            if recur:
-                alarm_nice_time = nice_time(alarm_time, use_ampm=True)
-                recur_description = describe_recurrence(
-                    recur, self.recurrence_dict, self.translate("and")
-                )
-                conf = self.ask_yesno(
-                    "confirm.recurring.alarm",
-                    data={"time": alarm_nice_time, "recurrence": recur_description},
-                )
-            else:
-                alarm_nice_dt = nice_date_time(alarm_time, now=today, use_ampm=True)
-                conf = self.ask_yesno("confirm.alarm", data={"time": alarm_nice_dt})
-            if not conf:
-                return
-            if conf == "yes":
-                when = [alarm_time]
-                confirmed_time = True
-            else:
-                # check if a new (corrected) time was given
-                when = extract_datetime(conf)
-                if when is not None:
-                    when = when[0]
-                if not when or when == today:
-                    # Not a confirmation and no date/time in statement, quit
-                    return
-                alarm_time = when
-                when = None  # reverify
+        verified_alarm = self._verify_alarm_time(when, today, recur)
+        if verified_alarm is None:
+            return
+        alarm_time, confirmed_time = verified_alarm
 
         alarm = {}
         if not recur:
@@ -398,22 +415,8 @@ class AlarmSkill(MycroftSkill):
         if alarm["repeat_rule"]:
             # Describe repeating alarms
             if alarm["repeat_rule"].startswith("FREQ=WEEKLY;INTERVAL=1;BYDAY="):
-                days = alarm["repeat_rule"][29:]  # e.g. "SU,WE"
-                days = (
-                    days.replace("SU", "0")
-                    .replace("MO", "1")
-                    .replace("TU", "2")
-                    .replace("WE", "3")
-                    .replace("TH", "4")
-                    .replace("FR", "5")
-                    .replace("SA", "6")
-                    .replace(",", " ")
-                )  # now "0 3"
-                recur = set()
-                for day in days.split():
-                    recur.add(day)
-                recur_description = describe_recurrence(
-                    recur, self.recurrence_dict, self.translate("and")
+                recur_description = describe_repeat_rule(
+                    alarm["repeat_rule"], self.recurrence_dict, self.translate("and")
                 )
             else:
                 recur_description = self.translate("repeats")

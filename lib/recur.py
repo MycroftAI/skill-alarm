@@ -107,3 +107,23 @@ def describe_recurrence(recur, recurrence_dict, connective="and"):
                 break
 
     return join_list(day_names, connective)
+
+def describe_repeat_rule(repeat_rule, recurrence_dict, connective="and"):
+    days = repeat_rule[29:]  # e.g. "SU,WE"
+    days = (
+        days.replace("SU", "0")
+            .replace("MO", "1")
+            .replace("TU", "2")
+            .replace("WE", "3")
+            .replace("TH", "4")
+            .replace("FR", "5")
+            .replace("SA", "6")
+            .replace(",", " ")
+    )  # now "0 3"
+    recur = set()
+    for day in days.split():
+        recur.add(day)
+    recur_description = describe_recurrence(
+        recur, recurrence_dict, connective
+    )
+    return recur_description
