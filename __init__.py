@@ -30,16 +30,16 @@ from mycroft.util.time import to_utc, now_local, now_utc
 
 from mycroft.util.time import to_system
 
-from .util.alarm import (
+from .lib.alarm import (
     alarm_log_dump,
     curate_alarms,
     get_alarm_local,
     get_next_repeat,
     has_expired_alarm,
 )
-from .util.format import nice_relative_time
-from .util.parse import fuzzy_match, utterance_has_midnight
-from .util.recur import create_day_set, create_recurring_rule, describe_recurrence
+from .lib.format import nice_relative_time
+from .lib.parse import fuzzy_match, utterance_has_midnight
+from .lib.recur import create_day_set, create_recurring_rule, describe_recurrence
 
 
 # WORKING PHRASES/SEQUENCES:
