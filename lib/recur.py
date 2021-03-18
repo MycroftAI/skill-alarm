@@ -30,9 +30,9 @@ def create_day_set(phrase, recurrence_dict):
         Set: days as integers
     """
     recur = set()
-    for r in recurrence_dict:
-        if r in phrase:
-            for day in recurrence_dict[r].split():
+    for recurrence in recurrence_dict:
+        if recurrence in phrase:
+            for day in recurrence_dict[recurrence].split():
                 recur.add(day)
     return recur
 
@@ -93,16 +93,16 @@ def describe_recurrence(recur, recurrence_dict, connective="and"):
     day_list = list(recur)
     day_list.sort()
     days = " ".join(day_list)
-    for r in recurrence_dict:
-        if recurrence_dict[r] == days:
-            return r  # accept the first perfect match
+    for recurrence in recurrence_dict:
+        if recurrence_dict[recurrence] == days:
+            return recurrence  # accept the first perfect match
 
     # Assemble a long desc, e.g. "Monday and Wednesday"
     day_names = []
     for day in days.split(" "):
-        for r in recurrence_dict:
-            if recurrence_dict[r] == day:
-                day_names.append(r)
+        for recurrence in recurrence_dict:
+            if recurrence_dict[recurrence] == day:
+                day_names.append(recurrence)
                 break
 
     return join_list(day_names, connective)
