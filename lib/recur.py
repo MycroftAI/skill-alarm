@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Recurrence functions for the Mycroft Alarm Skill."""
 
 from datetime import timedelta
 from dateutil.rrule import rrulestr

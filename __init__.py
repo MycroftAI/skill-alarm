@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
-from os.path import join, abspath, dirname
 from datetime import datetime, timedelta
-import os.path
-from alsaaudio import Mixer
+from os.path import join, abspath, dirname, isfile
 import re
+import time
+
+from alsaaudio import Mixer
 
 from adapt.intent import IntentBuilder
 from mycroft import MycroftSkill, intent_handler
@@ -67,17 +67,21 @@ from .lib.recur import create_day_set, create_recurring_rule, describe_recurrenc
 
 
 class AlarmSkill(MycroftSkill):
+    """The official Alarm Skill for Mycroft AI."""
+
     # seconds between end of a beep and the start of next
     # must be bigger than the max listening time (10 sec)
-    beep_gap = 15
-    default_sound = "constant_beep"
-    threshold = 0.7  # Threshold for word fuzzy matching
+    BEEP_GAP = 15
+    DEFAULT_SOUND = "constant_beep"
+    THRESHOLD = 0.7  # Threshold for word fuzzy matching
 
     def __init__(self):
         super(AlarmSkill, self).__init__()
         self.beep_process = None
         self.beep_start_time = None
         self.flash_state = 0
+        self.recurrence_dict = None
+        self.sound_name = None
 
         # Seconds of gap between sound repeats.
         # The value name must match an option from the 'sound' value of the
@@ -100,8 +104,8 @@ class AlarmSkill(MycroftSkill):
             # Retry instanciating the mixer
             try:
                 self.mixer = Mixer()
-            except Exception as e:
-                self.log.error("Couldn't allocate mixer, {}".format(repr(e)))
+            except Exception as err:
+                self.log.error("Couldn't allocate mixer, {}".format(repr(err)))
                 self.mixer = None
         self.saved_volume = None
 
@@ -131,11 +135,12 @@ class AlarmSkill(MycroftSkill):
         """Add any missing default settings."""
         # default sound is 'constant_beep'
         self.settings.setdefault("max_alarm_secs", 10 * 60)  # Beep for 10 min.
-        self.settings.setdefault("sound", AlarmSkill.default_sound)
+        self.settings.setdefault("sound", self.DEFAULT_SOUND)
         self.settings.setdefault("start_quiet", True)
         self.settings.setdefault("alarm", [])
 
     def initialize(self):
+        """Executed immediately after Skill has been initialized."""
         self.register_entity_file("daytype.entity")  # TODO: Keep?
         self.recurrence_dict = self.translate_namedvalues("recurring")
 
@@ -154,11 +159,12 @@ class AlarmSkill(MycroftSkill):
         self.add_event("private.mycroftai.has_alarm", self.on_has_alarm)
 
     def on_has_alarm(self, message):
-        # Reply to requests for alarm on/off status
+        """Reply to requests for alarm on/off status."""
         total = len(self.settings["alarm"])
         self.bus.emit(message.response(data={"active_alarms": total}))
 
     def set_alarm(self, when, name=None, repeat=None):
+        """Set an alarm at the specified datetime."""
         requested_time = when.replace(second=0, microsecond=0)
         if repeat:
             alarm = create_recurring_rule(requested_time, repeat)
@@ -183,14 +189,17 @@ class AlarmSkill(MycroftSkill):
         return alarm
 
     def _schedule(self):
+        """Schedule future event for an alarm and clean up as required."""
         # cancel any existing timed event
         self.cancel_scheduled_event("NextAlarm")
         self.settings["alarm"] = curate_alarms(self.settings["alarm"])
 
         # set timed event for next alarm (if it exists)
         if self.settings["alarm"]:
-            dt = get_alarm_local(self.settings["alarm"][0])
-            self.schedule_event(self._alarm_expired, to_system(dt), name="NextAlarm")
+            alarm_dt = get_alarm_local(self.settings["alarm"][0])
+            self.schedule_event(
+                self._alarm_expired, to_system(alarm_dt), name="NextAlarm"
+            )
 
     # Wake me on ... (hard to match with Adapt entities)
     @intent_handler(
@@ -200,6 +209,7 @@ class AlarmSkill(MycroftSkill):
         .optionally("Recurrence")
     )
     def handle_wake_me(self, message):
+        """Handler for "wake me at..."""
         self.handle_set_alarm(message)
 
     @intent_handler(
@@ -245,18 +255,20 @@ class AlarmSkill(MycroftSkill):
         # specify to set an alarm on midnight. If it's confirmed that
         # it's for a day only, then get another response from the user
         # to clarify what time on that day the recurring alarm is.
-        is_midnight = utterance_has_midnight(utt, when, self.threshold, self.translate_list("midnight"))
+        is_midnight = utterance_has_midnight(
+            utt, when, self.THRESHOLD, self.translate_list("midnight")
+        )
 
         if (when is None or when.time() == today.time()) and not is_midnight:
-            r = self.get_response("query.for.when", validator=extract_datetime)
-            if not r:
+            response = self.get_response("query.for.when", validator=extract_datetime)
+            if not response:
                 self.speak_dialog("alarm.schedule.cancelled")
                 return
-            when_temp = extract_datetime(r)
+            when_temp = extract_datetime(response)
             if when_temp is not None:
                 when_temp = when_temp[0]
                 # TODO add check for midnight
-                # is_midnight = utterance_has_midnight(r, when_temp, self.threshold, 
+                # is_midnight = utterance_has_midnight(response, when_temp, self.THRESHOLD,
                 #                                      self.translate_list("midnight"))
                 when = (
                     when_temp
@@ -278,17 +290,17 @@ class AlarmSkill(MycroftSkill):
         confirmed_time = False
         while (not when or when == today) and not confirmed_time:
             if recur:
-                t = nice_time(alarm_time, use_ampm=True)
+                alarm_nice_time = nice_time(alarm_time, use_ampm=True)
                 recur_description = describe_recurrence(
                     recur, self.recurrence_dict, self.translate("and")
                 )
                 conf = self.ask_yesno(
                     "confirm.recurring.alarm",
-                    data={"time": t, "recurrence": recur_description},
+                    data={"time": alarm_nice_time, "recurrence": recur_description},
                 )
             else:
-                t = nice_date_time(alarm_time, now=today, use_ampm=True)
-                conf = self.ask_yesno("confirm.alarm", data={"time": t})
+                alarm_nice_dt = nice_date_time(alarm_time, now=today, use_ampm=True)
+                conf = self.ask_yesno("confirm.alarm", data={"time": alarm_nice_dt})
             if not conf:
                 return
             if conf == "yes":
@@ -333,16 +345,17 @@ class AlarmSkill(MycroftSkill):
         if confirmed_time:
             self.speak_dialog("alarm.scheduled")
         else:
-            t = self._describe(alarm)
+            alarm_nice_time = self._describe(alarm)
             reltime = nice_relative_time(get_alarm_local(alarm))
             if recur:
                 self.speak_dialog(
                     "recurring.alarm.scheduled.for.time",
-                    data={"time": t, "rel": reltime},
+                    data={"time": alarm_nice_time, "rel": reltime},
                 )
             else:
                 self.speak_dialog(
-                    "alarm.scheduled.for.time", data={"time": t, "rel": reltime}
+                    "alarm.scheduled.for.time",
+                    data={"time": alarm_nice_time, "rel": reltime},
                 )
 
         self._show_alarm_anim(alarm_time)
@@ -355,9 +368,11 @@ class AlarmSkill(MycroftSkill):
         rx_file = self.find_resource("name.rx", "regex")
         if utt and rx_file:
             patterns = []
-            with open(rx_file) as f:
+            with open(rx_file) as regex_file:
                 patterns = [
-                    p.strip() for p in f.readlines() if not p.strip().startswith("#")
+                    p.strip()
+                    for p in regex_file.readlines()
+                    if not p.strip().startswith("#")
                 ]
 
             for pat in patterns:
@@ -375,9 +390,11 @@ class AlarmSkill(MycroftSkill):
 
     @property
     def use_24hour(self):
+        """Whether 24 hour time format should be used."""
         return self.config_core.get("time_format") == "full"
 
     def _describe(self, alarm):
+        """Describe the given alarm in a human expressable format."""
         if alarm["repeat_rule"]:
             # Describe repeating alarms
             if alarm["repeat_rule"].startswith("FREQ=WEEKLY;INTERVAL=1;BYDAY="):
@@ -401,7 +418,7 @@ class AlarmSkill(MycroftSkill):
             else:
                 recur_description = self.translate("repeats")
 
-            dt = get_alarm_local(alarm)
+            alarm_dt = get_alarm_local(alarm)
 
             dialog = "recurring.alarm"
             if alarm["name"] != "":
@@ -409,14 +426,14 @@ class AlarmSkill(MycroftSkill):
             return self.translate(
                 dialog,
                 data={
-                    "time": nice_time(dt, use_ampm=True),
+                    "time": nice_time(alarm_dt, use_ampm=True),
                     "recurrence": recur_description,
                     "name": alarm["name"],
                 },
             )
         else:
-            dt = get_alarm_local(alarm)
-            dt_string = nice_date_time(dt, now=now_local(), use_ampm=True)
+            alarm_dt = get_alarm_local(alarm)
+            dt_string = nice_date_time(alarm_dt, now=now_local(), use_ampm=True)
             if alarm["name"]:
                 return self.translate(
                     "alarm.named", data={"datetime": dt_string, "name": alarm["name"]}
@@ -432,7 +449,7 @@ class AlarmSkill(MycroftSkill):
         .optionally("Recurring")
     )
     def handle_status(self, message):
-
+        """Respond to request for alarm status."""
         utt = message.data.get("utterance")
 
         if len(self.settings["alarm"]) == 0:
@@ -519,7 +536,9 @@ class AlarmSkill(MycroftSkill):
         # specify to set an alarm on midnight. If it's confirmed that
         # it's for a day only, then get another response from the user
         # to clarify what time on that day the recurring alarm is.
-        is_midnight = utterance_has_midnight(utt, when, self.threshold, self.translate_list("midnight"))
+        is_midnight = utterance_has_midnight(
+            utt, when, self.THRESHOLD, self.translate_list("midnight")
+        )
 
         if when == today and not is_midnight:
             when = None
@@ -536,7 +555,7 @@ class AlarmSkill(MycroftSkill):
         recur = None
         recurrence_matches = None
         for word in self.recurrence_dict:
-            is_match = fuzzy_match(word, utt.lower(), self.threshold)
+            is_match = fuzzy_match(word, utt.lower(), self.THRESHOLD)
             if is_match:
                 recur = create_day_set(utt, self.recurrence_dict)
                 alarm_recur = create_recurring_rule(when, recur)
@@ -558,7 +577,7 @@ class AlarmSkill(MycroftSkill):
         name_matches = [
             a
             for a in alarms
-            if a["name"] and fuzzy_match(a["name"], utt, self.threshold)
+            if a["name"] and fuzzy_match(a["name"], utt, self.THRESHOLD)
         ]
 
         # Match Everything
@@ -648,6 +667,7 @@ class AlarmSkill(MycroftSkill):
         .optionally("Recurrence")
     )
     def handle_delete(self, message):
+        """Respond to request to remove a scheduled alarm."""
         if has_expired_alarm(self.settings["alarm"]):
             self._stop_expired_alarm()
             return
@@ -709,6 +729,10 @@ class AlarmSkill(MycroftSkill):
 
     @intent_handler("snooze.intent")
     def snooze_alarm(self, message):
+        """Snooze an expired alarm for the requested time.
+
+        If no time provided by user, defaults to 9 mins.
+        """
         if not has_expired_alarm(self.settings["alarm"]):
             return
 
@@ -722,8 +746,8 @@ class AlarmSkill(MycroftSkill):
 
         # Snooze always applies the the first alarm in the sorted array
         alarm = self.settings["alarm"][0]
-        dt = get_alarm_local(alarm)
-        snooze = to_utc(dt) + timedelta(minutes=snooze_for)
+        alarm_dt = get_alarm_local(alarm)
+        snooze = to_utc(alarm_dt) + timedelta(minutes=snooze_for)
 
         if "snooze" in alarm:
             # already snoozed
@@ -742,26 +766,33 @@ class AlarmSkill(MycroftSkill):
         self._schedule()
 
     @intent_handler("change.alarm.sound.intent")
-    def handle_change_alarm(self, message):
+    def handle_change_alarm(self, _):
+        """Handler for requests to change the alarm sound.
+
+        Note: This functionality is not yet supported. Directs users to Skill
+        settings on home.mycroft.ai.
+        """
         self.speak_dialog("alarm.change.sound")
 
     ##########################################################################
     # Audio and Device Feedback
 
     def converse(self, utterances, lang="en-us"):
+        """While an alarm is expired, check all utterances for Stop vocab."""
         if has_expired_alarm(self.settings["alarm"]):
             if utterances and self.voc_match(utterances[0], "StopBeeping"):
                 self._stop_expired_alarm()
                 return True  # and consume this phrase
 
-    def stop(self, message=None):
+    def stop(self, _=None):
+        """Respond to system stop commands."""
         if has_expired_alarm(self.settings["alarm"]):
             self._stop_expired_alarm()
             return True  # Stop signal handled no need to listen
         else:
             return False
 
-    def _play_beep(self, message=None):
+    def _play_beep(self, _=None):
         """ Play alarm sound file """
         now = now_local()
 
@@ -779,15 +810,15 @@ class AlarmSkill(MycroftSkill):
         alarm_file = join(
             abspath(dirname(__file__)), "sounds", self.sound_name + ".mp3"
         )
-        if not os.path.isfile(alarm_file):
+        if not isfile(alarm_file):
             # Couldn't find the required sound file
-            self.sound_name = AlarmSkill.default_sound
+            self.sound_name = self.DEFAULT_SOUND
             alarm_file = join(
                 abspath(dirname(__file__)), "sounds", self.sound_name + ".mp3"
             )
 
         beep_duration = self.sounds[self.sound_name]
-        repeat_interval = beep_duration + AlarmSkill.beep_gap
+        repeat_interval = beep_duration + self.BEEP_GAP
 
         next_beep = now + timedelta(seconds=repeat_interval)
 
@@ -809,8 +840,8 @@ class AlarmSkill(MycroftSkill):
         if self.flash_state < 3:
             if self.flash_state == 0:
                 alarm_timestamp = message.data["alarm_time"]
-                dt = get_alarm_local(timestamp=alarm_timestamp)
-                self._render_time(dt)
+                alarm_dt = get_alarm_local(timestamp=alarm_timestamp)
+                self._render_time(alarm_dt)
             self.flash_state += 1
         else:
             self.enclosure.mouth_reset()
@@ -872,7 +903,7 @@ class AlarmSkill(MycroftSkill):
             return False
 
     def _restore_volume(self):
-        # Return global volume to the appropriate level if we've messed with it
+        """Return global volume to the appropriate level if we've messed with it."""
         if self.saved_volume:
             self.mixer.setvolume(self.saved_volume[0])
             self.saved_volume = None
@@ -897,7 +928,7 @@ class AlarmSkill(MycroftSkill):
         self.sound_name = self.settings["sound"]  # user-selected alarm sound
         if not self.sound_name or self.sound_name not in self.sounds:
             # invalid sound name, use the default
-            self.sound_name = AlarmSkill.default_sound
+            self.sound_name = self.DEFAULT_SOUND
 
         if self.settings["start_quiet"] and self.mixer:
             if not self.saved_volume:  # don't overwrite if already saved!
@@ -927,11 +958,11 @@ class AlarmSkill(MycroftSkill):
         self.enclosure.mouth_reset()
         self.enclosure.activate_mouth_events()
 
-    def _show_alarm_anim(self, dt):
-        # Animated confirmation of the alarm
+    def _show_alarm_anim(self, alarm_dt):
+        """Animated confirmation of the alarm."""
         self.enclosure.mouth_reset()
 
-        self._render_time(dt)
+        self._render_time(alarm_dt)
         time.sleep(2)
         self.enclosure.mouth_reset()
 
@@ -966,10 +997,10 @@ class AlarmSkill(MycroftSkill):
                 time.sleep(0.15)
         self.enclosure.mouth_reset()
 
-    def _render_time(self, datetime):
-        # Show the time in numbers "8:00 AM"
+    def _render_time(self, alarm_dt):
+        """Show the time in numbers eg '8:00 AM'."""
         timestr = nice_time(
-            datetime, speech=False, use_ampm=True, use_24hour=self.use_24hour
+            alarm_dt, speech=False, use_ampm=True, use_24hour=self.use_24hour
         )
         x = 16 - ((len(timestr) * 4) // 2)  # centers on display
         if not self.use_24hour:
@@ -996,4 +1027,5 @@ class AlarmSkill(MycroftSkill):
 
 
 def create_skill():
+    """Create the Alarm Skill for Mycroft."""
     return AlarmSkill()
