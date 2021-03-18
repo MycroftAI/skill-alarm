@@ -20,7 +20,7 @@ from lingua_franca import set_default_lang
 from mycroft.util.parse import extract_datetime
 from mycroft.util.time import now_local
 
-from ..recur import create_day_set, create_recurring_rule, describe_recurrence
+from .lib.recur import create_day_set, create_recurring_rule, describe_recurrence
 
 set_default_lang("en-us")
 

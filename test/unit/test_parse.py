@@ -17,7 +17,7 @@ from datetime import datetime
 
 from mycroft.util.parse import extract_datetime
 
-from ..parse import fuzzy_match, utterance_has_midnight
+from ...lib.parse import fuzzy_match, utterance_has_midnight
 
 THRESHOLD = 0.7
 

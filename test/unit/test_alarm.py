@@ -20,7 +20,7 @@ from mycroft.util.parse import extract_datetime
 from mycroft.util.time import now_local, now_utc, to_local, to_utc
 from lingua_franca import set_default_lang
 
-from ..alarm import (
+from .lib.alarm import (
     alarm_log_dump,
     curate_alarms,
     get_alarm_local,
