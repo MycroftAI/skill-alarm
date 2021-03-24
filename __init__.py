@@ -911,22 +911,6 @@ class AlarmSkill(MycroftSkill):
             self.mixer.setvolume(self.saved_volume[0])
             self.saved_volume = None
 
-    def _disable_listen_beep(self):
-        user_config = LocalConf(USER_CONFIG)
-
-        if "user_beep_setting" not in self.settings:
-            # Save any current local config setting
-            self.settings["user_beep_setting"] = user_config.get(
-                "confirm_listening", None
-            )
-
-            # Disable in local config
-            user_config.merge({"confirm_listening": False})
-            user_config.store()
-
-            # Notify all processes to update their loaded configs
-            self.bus.emit(Message("configuration.updated"))
-
     def _alarm_expired(self):
         self.sound_name = self.settings["sound"]  # user-selected alarm sound
         if not self.sound_name or self.sound_name not in self.sounds:
@@ -939,8 +923,6 @@ class AlarmSkill(MycroftSkill):
                 self.volume = 0  # increase by 10% each pass
         else:
             self.saved_volume = None
-
-        self._disable_listen_beep()
 
         self._play_beep()
 
