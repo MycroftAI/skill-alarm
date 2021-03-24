@@ -739,11 +739,14 @@ class AlarmSkill(MycroftSkill):
         if not has_expired_alarm(self.settings["alarm"]):
             return
 
+        self.cancel_scheduled_event("Beep")
+        self.cancel_scheduled_event("NextAlarm")
+
         self.__end_beep()
         self.__end_flash()
 
         utt = message.data.get("utterance") or ""
-        snooze_for = extract_number(utt)
+        snooze_for = extract_number(utt[0])
         if not snooze_for or snooze_for < 1:
             snooze_for = 9  # default to 9 minutes
 
@@ -784,7 +787,16 @@ class AlarmSkill(MycroftSkill):
         """While an alarm is expired, check all utterances for Stop vocab."""
         if has_expired_alarm(self.settings["alarm"]):
             if utterances and self.voc_match(utterances[0], "StopBeeping"):
-                self._stop_expired_alarm()
+
+                if utterances[0].find("snooze") > -1: 
+                    message = Message(
+                      "internal.snooze",
+                      data=dict(utterance=utterances)
+                      )
+                    self.snooze_alarm(message)
+                else:    
+                    self._stop_expired_alarm()  # only do if NOT snooze!
+
                 return True  # and consume this phrase
 
     def stop(self, _=None):
