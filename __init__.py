@@ -787,17 +787,18 @@ class AlarmSkill(MycroftSkill):
         """While an alarm is expired, check all utterances for Stop vocab."""
         if has_expired_alarm(self.settings["alarm"]):
             if utterances and self.voc_match(utterances[0], "StopBeeping"):
+                self._stop_expired_alarm()  
+            elif self.voc_match(utterances[0], "Snooze"):
+                message = Message(
+                  "internal.snooze",
+                  data=dict(utterance=utterances)
+                  )
+                self.snooze_alarm(message)
+            else:
+                # TODO deal with this
+                self.log.info("AlarmSkill:Converse confused by %s" % (utterances[0],))
 
-                if utterances[0].find("snooze") > -1: 
-                    message = Message(
-                      "internal.snooze",
-                      data=dict(utterance=utterances)
-                      )
-                    self.snooze_alarm(message)
-                else:    
-                    self._stop_expired_alarm()  # only do if NOT snooze!
-
-                return True  # and consume this phrase
+            return True  # and consume this phrase
 
     def stop(self, _=None):
         """Respond to system stop commands."""
@@ -880,28 +881,7 @@ class AlarmSkill(MycroftSkill):
                 pass
             self.beep_process = None
         self._restore_volume()
-        self._restore_listen_beep()
-
-    def _restore_listen_beep(self):
-        if "user_beep_setting" in self.settings:
-            # Wipe from local config
-            new_conf_values = {"confirm_listening": False}
-            user_config = LocalConf(USER_CONFIG)
-
-            if (
-                self.settings["user_beep_setting"] is None
-                and "confirm_listening" in user_config
-            ):
-                del user_config["confirm_listening"]
-            else:
-                user_config.merge(
-                    {"confirm_listening": self.settings["user_beep_setting"]}
-                )
-            user_config.store()
-
-            # Notify all processes to update their loaded configs
-            self.bus.emit(Message("configuration.updated"))
-            del self.settings["user_beep_setting"]
+        #self._restore_listen_beep()
 
     def _stop_expired_alarm(self):
         if has_expired_alarm(self.settings["alarm"]):
