@@ -12,16 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import pytz
 from datetime import datetime, timedelta
 from os.path import join, abspath, dirname, isfile
 import re
 import time
-
 from alsaaudio import Mixer
-
 from adapt.intent import IntentBuilder
 from mycroft import MycroftSkill, intent_handler
-from mycroft.configuration.config import LocalConf, USER_CONFIG
+from mycroft.configuration.config import LocalConf, DEFAULT_CONFIG
 from mycroft.messagebus.message import Message
 from mycroft.util import play_mp3
 from mycroft.util.format import nice_date_time, nice_time, nice_date, join_list
@@ -46,7 +45,6 @@ from .lib.recur import (
     describe_repeat_rule,
 )
 
-
 # WORKING PHRASES/SEQUENCES:
 # Set an alarm
 #    for 9
@@ -69,7 +67,6 @@ from .lib.recur import (
 #   When is the next alarm
 #   >  7pm tomorrow
 #   Cancel it
-
 
 class AlarmSkill(MycroftSkill):
     """The official Alarm Skill for Mycroft AI."""
@@ -162,6 +159,13 @@ class AlarmSkill(MycroftSkill):
 
         # Support query for active alarms from other skills
         self.add_event("private.mycroftai.has_alarm", self.on_has_alarm)
+
+        # establish local timezone from config
+        default_config = LocalConf(DEFAULT_CONFIG)
+        loc = default_config.get("location")
+        tz = loc.get("timezone")
+        self.local_tz = tz["code"]
+        self.log.info("Local timezone configured for %s" % (self.local_tz,))
 
     def on_has_alarm(self, message):
         """Reply to requests for alarm on/off status."""
@@ -662,6 +666,117 @@ class AlarmSkill(MycroftSkill):
         # No matches found
         return (status[2], None)
 
+    def _fallback_get_alarm_matches(self, utt):
+        # TODO this needs to become a class variable both here and above
+        status = ["All", "Matched", "No Match Found", "User Cancelled", "Next"]
+        return_status = status[2]
+        alarm_list = self.settings["alarm"]
+
+        self.log.debug("utt:%s, alarms:%s" % (utt, self.settings["alarm"]))
+
+        # Lingua-franca workaround-001 - day of week and date confuses LF terribly. 
+        # if a day of the week (monday, friday, etc) is included with a
+        # valid date like "monday april 5th" LF will return bad data so we make 
+        # sure we never include both. "monday april 5th" becomes "april 5th".
+
+        # I'm sure to get blowback during pr for this ...
+        months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december']
+        days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+
+        for month in months:
+            if utt.find(month) > -1 and re.search(r'\d+', utt):
+                # if we have a month and a number/day
+                # whack any days of week terms
+                for day in days:
+                    utt = utt.replace(day,'')
+
+        self.log.debug("LF scrubbed utt = %s" % (utt,))
+
+        when, utt_no_datetime = extract_datetime(utt) or (None, utt)
+        self.log.debug("when: %s (this is in local timezone), what: %s" % (when, utt_no_datetime))
+
+        when_utc = when.astimezone(pytz.utc)
+        self.log.debug("when_utc: %s (this is in utc)" % (when_utc,))
+
+        have_time = False
+        if when_utc is None:
+            self.log.warning("Request contains no discernable date or time")
+        else:
+            # assumption 1 - if time is midnight we probably don't have a time
+            # in other words the user probably said something like 'monday the 25th'
+            # or tomorrow. 
+            # we can look for the term 'midnight' in the utterance and
+            # if present we can assume we DO have a time (midnight = 00:00:00), 
+            # otherwise we assume we don't have a time
+            user_time = when.strftime("%H:%M:%S")
+            if user_time == "00:00:00" and utt.find("midnight") == -1:
+                self.log.debug("we have no user time ===> 00:00:00")
+            else:
+                have_time = True
+
+        self.log.debug("Do we have a user time:%s" % (have_time,))
+
+        alarm_matches = []
+
+        user_dow = None   # if user said a day of the week, this is it
+
+        result = re.findall('(mon|tues|wed|thurs|fri|sat|sun)day', utt)
+        if result:
+            utt_dow = result[0] + 'day'
+            user_dow = days.index(utt_dow) if utt_dow in days else None
+
+        self.log.debug("user_dow:%s" % (user_dow,))
+
+        # if the user says a day of the week (mon-sun) we 
+        # keep them in a separate list of day of week matches
+        dow_matches = []
+
+        for alm in alarm_list:
+            self.log.debug("    Loop: %s" % (alm,))
+
+            # get utc time from alarm timestamp
+            dt_obj = datetime.fromtimestamp( alm['timestamp'] )
+            dt_obj = dt_obj.astimezone(pytz.utc)
+
+            # we also need a local version of our utc time
+            cfg_tz = pytz.timezone(self.local_tz) 
+            dt_local = dt_obj.astimezone(cfg_tz)
+
+            if user_dow == dt_local.weekday():
+                dow_matches.append(alm)
+
+            if have_time:
+                # unambiguous
+                if when_utc == dt_obj:
+                    alarm_matches.append(alm)
+            else:
+                self.log.debug("    Loop:have date but no time - disambiguate here!")
+                self.log.debug("    Loop: when:%s, dt_obj:%s" % (when_utc.strftime("%y-%m-%d"), dt_obj.strftime("%y-%m-%d")))
+                # do dates match ?
+                if when_utc.strftime("%y-%m-%d") == dt_obj.strftime("%y-%m-%d"):
+                    self.log.debug("Note, date match with no time")
+                    alarm_matches.append(alm)
+
+        if len(alarm_matches) == 0:
+            # we can try some heuristics here
+            self.log.info("Entering heuristics phase, dow_matches:%s" % (dow_matches,))
+            alarm_matches = dow_matches
+
+
+        if len(alarm_matches) == 1:
+            return_status = status[1]
+        else:
+            if len(alarm_matches) > 1:
+                self.log.debug("Can't disambiguate, match count %s is > 1"  % (len(alarm_matches,)))
+                self.speak_dialog("alarm.confused")
+
+        # meet previous ret code protocol
+        if len(alarm_matches) == 0:
+            alarm_matches = None
+
+        return return_status, alarm_matches
+
+
     @intent_handler(
         IntentBuilder("")
         .require("Delete")
@@ -689,6 +804,12 @@ class AlarmSkill(MycroftSkill):
             dialog="ask.which.alarm.delete",
             is_response=False,
         )
+
+        if alarms is None:
+            # the poor _get_alarm_matches() method is a bit of a dim bulb.
+            # we'll inject some heuristics into it here
+            status, alarms = self._fallback_get_alarm_matches(utt)
+            self.log.info("No alarms was converted to - status:%s, alarms:%s" % (status, alarms))
 
         if alarms:
             total = len(alarms)
