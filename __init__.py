@@ -161,10 +161,7 @@ class AlarmSkill(MycroftSkill):
         self.add_event("private.mycroftai.has_alarm", self.on_has_alarm)
 
         # establish local timezone from config
-        default_config = LocalConf(DEFAULT_CONFIG)
-        loc = default_config.get("location")
-        tz = loc.get("timezone")
-        self.local_tz = tz["code"]
+        self.local_tz = self.config_core.get("location").get("timezone").get("code")
         self.log.info("Local timezone configured for %s" % (self.local_tz,))
 
     def on_has_alarm(self, message):
