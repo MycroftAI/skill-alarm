@@ -10,6 +10,7 @@ from test.integrationtests.voight_kampff import emit_utterance, wait_for_dialog
 @given('an alarm is set for {alarm_time}')
 def given_set_alarm(context, alarm_time):
     emit_utterance(context.bus, 'set an alarm for {}'.format(alarm_time))
+    time.sleep(3)
     wait_for_dialog(context.bus, ['alarm.scheduled.for.time'])
     context.bus.clear_messages()
 
@@ -25,16 +26,17 @@ def given_no_alarms(context):
                  'alarm.cancelled.multi',
                  'alarm.cancelled.recurring']
 
-    print('ASKING QUESTION')
+    print('\nASKING QUESTION')
     emit_utterance(context.bus, 'cancel all alarms')
     for i in range(10):
+        wait_while_speaking()
         for message in context.bus.get_messages('speak'):
             if message.data.get('meta', {}).get('dialog') in followups:
-                print('Answering yes!')
-                time.sleep(1)
-                wait_while_speaking()
+                print("\nWaiting before saying yes ...")
+                time.sleep(2)
                 emit_utterance(context.bus, 'yes')
-                wait_for_dialog(context.bus, cancelled)
+                rc = wait_for_dialog(context.bus, cancelled)
+                print('\nWere we understood--->rc= %s' % (rc,))
                 context.bus.clear_messages()
                 return
             elif message.data.get('meta', {}).get('dialog') in no_alarms:

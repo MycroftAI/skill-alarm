@@ -20,7 +20,6 @@ import time
 from alsaaudio import Mixer
 from adapt.intent import IntentBuilder
 from mycroft import MycroftSkill, intent_handler
-from mycroft.configuration.config import LocalConf, DEFAULT_CONFIG
 from mycroft.messagebus.message import Message
 from mycroft.util import play_mp3
 from mycroft.util.format import nice_date_time, nice_time, nice_date, join_list
@@ -46,23 +45,7 @@ from .lib.recur import (
 )
 
 # WORKING PHRASES/SEQUENCES:
-# Set an alarm
-#    for 9
-#    no for 9 am
-# Set an alarm for tomorrow evening at 8:20
-# Set an alarm for monday morning at 8
-# create an alarm for monday morning at 8
-# snooze
-# stop
-# turn off the alarm
-# create a repeating alarm for tuesdays at 7 am
-# Set a recurring alarm
-# Set a recurring alarm for weekdays at 7
-# snooze for 15 minutes
-# set an alarm for 20 seconds from now
-# Set an alarm every monday at 7
-# "Set a recurring alarm for mondays and wednesdays at 7"
-# "Set an alarm for 10 am every weekday"
+# See VK Tests for requirements/usage.
 # TODO: Context - save the alarm found in queries as context
 #   When is the next alarm
 #   >  7pm tomorrow
@@ -107,7 +90,7 @@ class AlarmSkill(MycroftSkill):
             try:
                 self.mixer = Mixer()
             except Exception as err:
-                self.log.error("Couldn't allocate mixer, {}".format(repr(err)))
+                self.log.warning("Couldn't allocate mixer, {}".format(repr(err)))
                 self.mixer = None
         self.saved_volume = None
 
@@ -161,8 +144,18 @@ class AlarmSkill(MycroftSkill):
         self.add_event("private.mycroftai.has_alarm", self.on_has_alarm)
 
         # establish local timezone from config
-        self.local_tz = self.config_core.get("location").get("timezone").get("code")
+        self.local_tz = self.location_timezone
         self.log.info("Local timezone configured for %s" % (self.local_tz,))
+
+        self.days = [
+                'monday', 
+                'tuesday', 
+                'wednesday', 
+                'thursday', 
+                'friday', 
+                'saturday', 
+                'sunday'
+                ]
 
     def on_has_alarm(self, message):
         """Reply to requests for alarm on/off status."""
@@ -271,7 +264,6 @@ class AlarmSkill(MycroftSkill):
 
     @intent_handler(
         IntentBuilder("")
-        .require("Set")
         .require("Alarm")
         .optionally("Recurring")
         .optionally("Recurrence")
@@ -526,7 +518,7 @@ class AlarmSkill(MycroftSkill):
 
         # No alarms
         if alarms is None or len(alarms) == 0:
-            self.log.error("Cannot get match. No active alarms.")
+            self.log.info("Cannot get match. No active alarms.")
             return (status[2], None)
 
         # Extract Alarm Time
@@ -553,7 +545,28 @@ class AlarmSkill(MycroftSkill):
             time_alarm = to_utc(when).timestamp()
             if is_midnight:
                 time_alarm = time_alarm + 86400.0
+
             time_matches = [a for a in alarms if abs(a["timestamp"] - time_alarm) <= 60]
+
+        # add other categories of alarm matches here
+        utt = self.workaround_lingua_franca(utt)
+        when, utt_no_datetime = extract_datetime(utt) or (None, utt)
+
+        when_utc = None
+        if when is not None:
+            when_utc = when.astimezone(pytz.utc)
+
+        have_time = False
+        if when_utc:
+            user_time = when.strftime("%H:%M:%S")
+            if user_time == "00:00:00" and self.voc_match(utt, "Midnight"):
+                have_time = True
+            if user_time != "00:00:00":
+                have_time = True
+
+        user_dow = self.get_dow_from_utterance(utt)
+
+        advanced_matches = self.get_advanced_matches(utt, have_time, when, when_utc, user_dow, alarms)
 
         # Extract Recurrence
         recur = None
@@ -594,6 +607,8 @@ class AlarmSkill(MycroftSkill):
 
         # Find the Intersection of the Alarms list and all the matched alarms
         orig_count = len(alarms)
+        if len(advanced_matches) > 0:
+            alarms = advanced_matches
         if when and time_matches:
             alarms = [a for a in alarms if a in time_matches]
         if recur and recurrence_matches:
@@ -608,6 +623,11 @@ class AlarmSkill(MycroftSkill):
         elif utt and any(fuzzy_match(i, utt, 1) for i in next_words):
             return (status[4], [alarms[0]])
 
+        if max_results < orig_count and len(alarms) == max_results:
+            # if we started with more than we have
+            # and that's how many we asked for
+            return (status[1], alarms)
+
         # Given something to match but no match found
         if (
             (number and number > len(alarms))
@@ -615,8 +635,8 @@ class AlarmSkill(MycroftSkill):
             or (when and not time_matches)
         ):
             return (status[2], None)
-        # If number of alarms filtered were the same, assume user asked for
-        # All alarms
+        # If number of alarms filtered were the same, 
+        # assume user asked for ALL alarms
         if (
             len(alarms) == orig_count
             and max_results > 1
@@ -625,6 +645,7 @@ class AlarmSkill(MycroftSkill):
             and not recur
         ):
             return (status[0], alarms)
+
         # Return immediately if there is ordinal
         if number and number <= len(alarms):
             return (status[1], [alarms[number - 1]])
@@ -641,6 +662,7 @@ class AlarmSkill(MycroftSkill):
             if desc:
                 items_string = join_list(desc, self.translate("and"))
 
+            self.log.debug("Too many alarms, ask for clarification")
             reply = self.get_response(
                 dialog,
                 data={
@@ -649,6 +671,7 @@ class AlarmSkill(MycroftSkill):
                 },
                 num_retries=1,
             )
+
             if reply:
                 return self._get_alarm_matches(
                     reply,
@@ -663,70 +686,46 @@ class AlarmSkill(MycroftSkill):
         # No matches found
         return (status[2], None)
 
-    def _fallback_get_alarm_matches(self, utt):
-        # TODO this needs to become a class variable both here and above
-        status = ["All", "Matched", "No Match Found", "User Cancelled", "Next"]
-        return_status = status[2]
-        alarm_list = self.settings["alarm"]
-
-        self.log.debug("utt:%s, alarms:%s" % (utt, self.settings["alarm"]))
-
-        # Lingua-franca workaround-001 - day of week and date confuses LF terribly. 
-        # if a day of the week (monday, friday, etc) is included with a
-        # valid date like "monday april 5th" LF will return bad data so we make 
-        # sure we never include both. "monday april 5th" becomes "april 5th".
-
-        # I'm sure to get blowback during pr for this ...
-        months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december']
-        days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
-
-        for month in months:
-            if utt.find(month) > -1 and re.search(r'\d+', utt):
-                # if we have a month and a number/day
-                # whack any days of week terms
-                for day in days:
-                    utt = utt.replace(day,'')
-
-        self.log.debug("LF scrubbed utt = %s" % (utt,))
-
-        when, utt_no_datetime = extract_datetime(utt) or (None, utt)
-        self.log.debug("when: %s (this is in local timezone), what: %s" % (when, utt_no_datetime))
-
-        when_utc = when.astimezone(pytz.utc)
-        self.log.debug("when_utc: %s (this is in utc)" % (when_utc,))
-
-        have_time = False
-        if when_utc is None:
-            self.log.warning("Request contains no discernable date or time")
-        else:
-            # assumption 1 - if time is midnight we probably don't have a time
-            # in other words the user probably said something like 'monday the 25th'
-            # or tomorrow. 
-            # we can look for the term 'midnight' in the utterance and
-            # if present we can assume we DO have a time (midnight = 00:00:00), 
-            # otherwise we assume we don't have a time
-            user_time = when.strftime("%H:%M:%S")
-            if user_time == "00:00:00" and utt.find("midnight") == -1:
-                self.log.debug("we have no user time ===> 00:00:00")
+    # sometimes LF returns a roman numeral for
+    # a number so the 26th will return xxvi
+    def roman_to_int(self, s):
+        rom_val = {'I': 1, 'V': 5, 'X': 10, 'L': 50, 'C': 100, 'D': 500, 'M': 1000}
+        int_val = 0
+        for i in range(len(s)):
+            if i > 0 and rom_val[s[i]] > rom_val[s[i - 1]]:
+                int_val += rom_val[s[i]] - 2 * rom_val[s[i - 1]]
             else:
-                have_time = True
+                int_val += rom_val[s[i]]
+        return int_val
 
-        self.log.debug("Do we have a user time:%s" % (have_time,))
+    def get_advanced_matches(self, utt, have_time, when, when_utc, user_dow, alarm_list):
+        # holds exact date and time matches
+        exact_matches = []
+        dom = None
+        try:
+            dom = self.roman_to_int(utt)
+        except:
+            self.log.debug("Not a roman numeral")
 
-        alarm_matches = []
-
-        user_dow = None   # if user said a day of the week, this is it
-
-        result = re.findall('(mon|tues|wed|thurs|fri|sat|sun)day', utt)
-        if result:
-            utt_dow = result[0] + 'day'
-            user_dow = days.index(utt_dow) if utt_dow in days else None
-
-        self.log.debug("user_dow:%s" % (user_dow,))
+        if dom is None:
+            dom = extract_number(utt)
 
         # if the user says a day of the week (mon-sun) we 
         # keep them in a separate list of day of week matches
         dow_matches = []
+
+        # we also look for specific time matches like 9am
+        tod_matches = []
+        if when_utc:
+            tod_matches = self.get_tod_matches(when.time(), alarm_list)
+
+        # these alarms match our when_utc date only
+        date_matches = []
+
+        # these alarms match any numbers passed in like
+        # the 25th, 5 etc which we assume are dom
+        # hopefully this won't muss up ordinals
+        dom_matches = []
 
         for alm in alarm_list:
             self.log.debug("    Loop: %s" % (alm,))
@@ -742,37 +741,94 @@ class AlarmSkill(MycroftSkill):
             if user_dow == dt_local.weekday():
                 dow_matches.append(alm)
 
+            if dom == dt_local.day:
+                dom_matches.append(alm)
+
             if have_time:
                 # unambiguous
                 if when_utc == dt_obj:
-                    alarm_matches.append(alm)
+                    exact_matches.append(alm)
             else:
-                self.log.debug("    Loop:have date but no time - disambiguate here!")
-                self.log.debug("    Loop: when:%s, dt_obj:%s" % (when_utc.strftime("%y-%m-%d"), dt_obj.strftime("%y-%m-%d")))
-                # do dates match ?
-                if when_utc.strftime("%y-%m-%d") == dt_obj.strftime("%y-%m-%d"):
-                    self.log.debug("Note, date match with no time")
-                    alarm_matches.append(alm)
+                self.log.debug("    Loop: when:%s, dt_obj:%s" % (when_utc, dt_obj))
+                if when_utc is not None and dt_obj is not None:    
+                    # do dates match ?
+                    if when_utc.strftime("%y-%m-%d") == dt_obj.strftime("%y-%m-%d"):
+                        date_matches.append(alm)
 
-        if len(alarm_matches) == 0:
-            # we can try some heuristics here
-            self.log.info("Entering heuristics phase, dow_matches:%s" % (dow_matches,))
-            alarm_matches = dow_matches
+        if len(exact_matches) > 0:
+            return exact_matches
 
+        if len(date_matches) > 0:
+            return date_matches
 
-        if len(alarm_matches) == 1:
-            return_status = status[1]
-        else:
-            if len(alarm_matches) > 1:
-                self.log.debug("Can't disambiguate, match count %s is > 1"  % (len(alarm_matches,)))
-                self.speak_dialog("alarm.confused")
+        if len(tod_matches) > 0:
+            return tod_matches
 
-        # meet previous ret code protocol
-        if len(alarm_matches) == 0:
-            alarm_matches = None
+        if len(dow_matches) > 0:
+            return dow_matches
 
-        return return_status, alarm_matches
+        return dom_matches
 
+    def get_tod_matches(self, alarm_time, alarm_list):
+        tod_matches = []
+
+        # find alarms where the time matches
+        for alarm in alarm_list:
+            # get utc time from alarm timestamp
+            dt_obj = datetime.fromtimestamp( alarm['timestamp'] )
+            dt_obj = dt_obj.astimezone(pytz.utc)
+
+            # we also need a local version of our utc time
+            cfg_tz = pytz.timezone(self.local_tz) 
+            dt_local = dt_obj.astimezone(cfg_tz)
+
+            self.log.debug("Check for TOD matches, dt_local.time()=%s" % (dt_local.time(),))
+            if dt_local.time() == alarm_time:
+                tod_matches.append(alarm)
+
+        return tod_matches
+
+    def get_dow_from_utterance(self, utt):
+        user_dow = None
+        result = re.findall('(mon|tues|wed|thurs|fri|sat|sun)day', utt)
+        if result:
+            utt_dow = result[0] + 'day'
+            user_dow = self.days.index(utt_dow) if utt_dow in self.days else None
+        return user_dow
+
+    def workaround_lingua_franca(self, utt):
+        # Lingua-franca workaround - day of 
+        # week and date confuses LF terribly. 
+        # if a day of the week (monday, friday, 
+        # etc) is included with a valid date
+        # like "monday april 5th" LF will 
+        # return bad data so we make sure 
+        # we never include both. "monday 
+        # april 5th" becomes "april 5th".
+
+        months = [
+                'january', 
+                'february', 
+                'march', 
+                'april', 
+                'may', 
+                'june', 
+                'july', 
+                'august', 
+                'september', 
+                'october', 
+                'november', 
+                'december'
+                ]
+
+        for month in months:
+            if utt.find(month) > -1 and re.search(r'\d+', utt):
+                # if we have a month and a number/day
+                # whack any days of week terms
+                for day in self.days:
+                    utt = utt.replace(day,'')
+
+        return utt
 
     @intent_handler(
         IntentBuilder("")
@@ -801,12 +857,6 @@ class AlarmSkill(MycroftSkill):
             dialog="ask.which.alarm.delete",
             is_response=False,
         )
-
-        if alarms is None:
-            # the poor _get_alarm_matches() method is a bit of a dim bulb.
-            # we'll inject some heuristics into it here
-            status, alarms = self._fallback_get_alarm_matches(utt)
-            self.log.info("No alarms was converted to - status:%s, alarms:%s" % (status, alarms))
 
         if alarms:
             total = len(alarms)
