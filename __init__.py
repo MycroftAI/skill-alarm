@@ -22,7 +22,7 @@ from adapt.intent import IntentBuilder
 from mycroft import MycroftSkill, intent_handler
 from mycroft.messagebus.message import Message
 from mycroft.util import play_mp3
-from mycroft.util.format import nice_date_time, nice_time, nice_date, join_list
+from mycroft.util.format import nice_date_time, nice_time, nice_date, join_list, date_time_format
 from mycroft.util.parse import extract_datetime, extract_number
 from mycroft.util.time import to_utc, now_local, now_utc
 
@@ -147,15 +147,15 @@ class AlarmSkill(MycroftSkill):
         self.local_tz = self.location_timezone
         self.log.info("Local timezone configured for %s" % (self.local_tz,))
 
-        self.days = [
-                'monday', 
-                'tuesday', 
-                'wednesday', 
-                'thursday', 
-                'friday', 
-                'saturday', 
-                'sunday'
-                ]
+        self.weekdays = None
+        self.months = None
+        date_time_format.cache(self.lang)
+        if self.lang in date_time_format.lang_config.keys():
+            self.weekdays = list(date_time_format.lang_config[self.lang]['weekday'].values())
+            self.months = list(date_time_format.lang_config[self.lang]['month'].values())
+        if self.weekdays is None or self.months is None:
+            self.log.error("Error! weekdays:%s, months:%s" % (self.weekdays, self.months))
+
 
     def on_has_alarm(self, message):
         """Reply to requests for alarm on/off status."""
@@ -554,7 +554,8 @@ class AlarmSkill(MycroftSkill):
 
         when_utc = None
         if when is not None:
-            when_utc = when.astimezone(pytz.utc)
+            #when_utc = when.astimezone(pytz.utc)
+            when_utc = to_utc(when)
 
         have_time = False
         if when_utc:
@@ -699,6 +700,14 @@ class AlarmSkill(MycroftSkill):
         return int_val
 
     def get_advanced_matches(self, utt, have_time, when, when_utc, user_dow, alarm_list):
+        '''see if we have any of the following 
+           in order of preference
+           exact matches
+           date matches 
+           time of day matches (tod)
+           day of week matches (dow)
+           day of month matches (dom)
+        '''
         # holds exact date and time matches
         exact_matches = []
         dom = None
@@ -770,9 +779,9 @@ class AlarmSkill(MycroftSkill):
         return dom_matches
 
     def get_tod_matches(self, alarm_time, alarm_list):
+        ''' find alarms where the time matches'''
         tod_matches = []
 
-        # find alarms where the time matches
         for alarm in alarm_list:
             # get utc time from alarm timestamp
             dt_obj = datetime.fromtimestamp( alarm['timestamp'] )
@@ -793,7 +802,7 @@ class AlarmSkill(MycroftSkill):
         result = re.findall('(mon|tues|wed|thurs|fri|sat|sun)day', utt)
         if result:
             utt_dow = result[0] + 'day'
-            user_dow = self.days.index(utt_dow) if utt_dow in self.days else None
+            user_dow = self.weekdays.index(utt_dow) if utt_dow in self.weekdays else None
         return user_dow
 
     def workaround_lingua_franca(self, utt):
@@ -806,26 +815,11 @@ class AlarmSkill(MycroftSkill):
         # we never include both. "monday 
         # april 5th" becomes "april 5th".
 
-        months = [
-                'january', 
-                'february', 
-                'march', 
-                'april', 
-                'may', 
-                'june', 
-                'july', 
-                'august', 
-                'september', 
-                'october', 
-                'november', 
-                'december'
-                ]
-
-        for month in months:
+        for month in self.months:
             if utt.find(month) > -1 and re.search(r'\d+', utt):
                 # if we have a month and a number/day
                 # whack any days of week terms
-                for day in self.days:
+                for day in self.weekdays:
                     utt = utt.replace(day,'')
 
         return utt
@@ -980,6 +974,8 @@ class AlarmSkill(MycroftSkill):
         """ Play alarm sound file """
         now = now_local()
 
+        self.bus.emit(Message("mycroft.alarm.beeping", data=dict(time=now.strftime("%m/%d/%Y, %H:%M:%S"))))
+
         if not self.beep_start_time:
             self.beep_start_time = now
         elif (now - self.beep_start_time).total_seconds() > self.settings[
@@ -1049,7 +1045,6 @@ class AlarmSkill(MycroftSkill):
                 pass
             self.beep_process = None
         self._restore_volume()
-        #self._restore_listen_beep()
 
     def _stop_expired_alarm(self):
         if has_expired_alarm(self.settings["alarm"]):

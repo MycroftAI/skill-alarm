@@ -448,3 +448,40 @@ Feature: Alarm skill functionality
     | remove all alarms |
     | remove every alarm |
     | delete every alarm |
+
+# Jira MS-72 https://mycroft.atlassian.net/browse/MS-72
+  Scenario Outline: user snoozes a beeping alarm
+    Given an english speaking user
+     And there are no previous alarms set
+     And an alarm is expired and beeping
+     When the user says "<snooze>"
+     Then "mycroft-alarm" should stop beeping and start beeping again in 10 minutes
+
+  Examples: snooze a beeping alarm
+    | snooze |
+    | snooze |
+    | snooze alarm |
+    | not yet |
+    | 10 more minutes |
+    | 10 minutes |
+    | snooze for 10 minutes |
+    | give me 10 minutes |
+    | wake me up in 10 minutes |
+    | remind me in 10 minutes |
+    | let me sleep |
+
+  # Jira MS-73 https://mycroft.atlassian.net/browse/MS-73
+  Scenario Outline: user snoozes an beeping alarm for a specific time
+    Given an english speaking user
+     And there are no previous alarms set
+     And an alarm is expired and beeping
+     When the user says "<snooze for a time>"
+     Then "mycroft-alarm" should stop beeping and start beeping again in 5 minutes
+
+  Examples: snooze a beeping alarm for a specific time
+    | snooze for a time |
+    | snooze for 5 minutes |
+    | give me 5 minutes |
+    | snooze 5 |
+    | snooze for 5 |
+
