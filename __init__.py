@@ -554,7 +554,6 @@ class AlarmSkill(MycroftSkill):
 
         when_utc = None
         if when is not None:
-            #when_utc = when.astimezone(pytz.utc)
             when_utc = to_utc(when)
 
         have_time = False
@@ -674,6 +673,11 @@ class AlarmSkill(MycroftSkill):
             )
 
             if reply:
+                # if user wants to bail, bail!
+                if self.voc_match(utt, "Terminate"):
+                    self.log.debug("user cancels the select request")
+                    return (status[3], None)
+
                 return self._get_alarm_matches(
                     reply,
                     alarm=alarms,
@@ -852,6 +856,10 @@ class AlarmSkill(MycroftSkill):
             is_response=False,
         )
 
+        if status == "User Cancelled":
+            self.speak_dialog("alarm.delete.cancelled")
+            return
+
         if alarms:
             total = len(alarms)
         else:
@@ -860,6 +868,7 @@ class AlarmSkill(MycroftSkill):
         if total == 1:
             desc = self._describe(alarms[0])
             recurring = ".recurring" if alarms[0]["repeat_rule"] else ""
+
             if (
                 self.ask_yesno("ask.cancel.desc.alarm" + recurring, data={"desc": desc})
                 == "yes"
