@@ -10,12 +10,11 @@ Feature: Alarm skill functionality
     | set alarm for a time |
     | set alarm for 8 am |
     | set an alarm for 7:30 am |
-    | create an alarm for 7:30 am |
+    | create an alarm for 7:30 pm |
     | start an alarm for 6:30 am |
     | let me know when it's 8:30 pm |
     | wake me up at 7 tomorrow morning |
 
-  @xfail
   # MS-64 https://mycroft.atlassian.net/browse/MS-64
   Scenario Outline: user sets an alarm for a time
     Given an english speaking user
@@ -25,8 +24,8 @@ Feature: Alarm skill functionality
 
   Examples: user sets an alarm for a time
     | set alarm for a time |
-    | alarm 6 pm |
-    | alarm for 8 tonight |
+    | set alarm 6:01 pm |
+    | alarm for 8:02 tonight |
 
   Scenario Outline: user sets an alarm without saying a time
     Given an english speaking user
@@ -39,12 +38,11 @@ Feature: Alarm skill functionality
   Examples: set alarm withot saying a time
     | set alarm without saying a time |
     | set alarm |
-    | set an alarm |
+    | new alarm |
     | create an alarm |
 
-  @xfail
   # Jira MS-65 https://mycroft.atlassian.net/browse/MS-65
-  Scenario Outline: Failing user sets an alarm without saying a time
+  Scenario Outline: user sets an alarm without saying a time
     Given an english speaking user
      And there are no previous alarms set
      When the user says "<set alarm without saying a time>"
@@ -54,10 +52,9 @@ Feature: Alarm skill functionality
 
   Examples: set alarm withot saying a time
     | set alarm without saying a time |
-    | set an alarm for tomorrow morning |
+    | set an alarm for tomorrow |
     | wake me up tomorrow |
-    | alarm tonight |
-    | alarm |
+    | create alarm |
 
   Scenario Outline: User sets an alarm without saying a time but then cancels
     Given an english speaking user
@@ -71,7 +68,6 @@ Feature: Alarm skill functionality
     | set an alarm | nevermind |
     | create an alarm | cancel |
 
-  @xfail
   # Jira MS-109 https://mycroft.atlassian.net/browse/MS-109
   Scenario Outline: User sets an alarm without saying a time but then cancels
     Given an english speaking user
@@ -94,10 +90,10 @@ Feature: Alarm skill functionality
     | set a named alarm for a time |
     | set an alarm named sandwich for 12 pm |
     | set an alarm for 10 am for stretching |
-    | set an alarm for stretching 10 am |
+    | set an alarm for stretching 10 pm |
     | set an alarm named brunch for 11 am |
-    | set an alarm called brunch for 11 am |
-    | set an alarm named workout for 11 am |
+    | set an alarm called brunch for 11:30 am |
+    | set an alarm named workout for 11 pm |
 
   Scenario Outline: user sets an alarm without specifiying am or pm
     Given an english speaking user
@@ -109,10 +105,9 @@ Feature: Alarm skill functionality
     | set an alarm for a time without am or pm |
     | set an alarm for 6:30 |
     | set an alarm for 7 |
-    | wake me up at 6:30 |
+    | wake me up at 5:30 |
     | let me know when it's 6 |
 
-  @xfail
   # Jira MS-66 https://mycroft.atlassian.net/browse/MS-66
   Scenario Outline: user sets an alarm without specifiying am or pm
     Given an english speaking user
@@ -122,11 +117,10 @@ Feature: Alarm skill functionality
 
   Examples: user sets an alarm without specifiying am or pm
     | set an alarm for a time without am or pm |
-    | alarm for 12 |
+    | set alarm for 12 |
 
-  @xfail
   # Jira MS-67 https://mycroft.atlassian.net/browse/MS-67
-  Scenario Outline: Failing set an alarm for a duration instead of a time
+  Scenario Outline: set an alarm for a duration instead of a time
     Given an english speaking user
      And there are no previous alarms set
      When the user says "<set an alarm for a duration>"
@@ -134,9 +128,9 @@ Feature: Alarm skill functionality
 
   Examples:
     | set an alarm for a duration |
-    | set an alarm for 30 minutes |
-    | alarm in 5 minutes |
-    | alarm in 5 minutes and 30 seconds |
+    | create an alarm for 30 minutes |
+    | set alarm in 5 minutes |
+    | new alarm in 5 minutes and 30 seconds |
     | set an alarm 8 hours from now |
     | set an alarm 8 hours and 30 minutes from now |
 
@@ -163,24 +157,24 @@ Feature: Alarm skill functionality
   Examples: set a recurring alarm
     | set a recurring alarm for a time |
     | set alarm every weekday at 7:30 am |
-    | wake me up every weekday at 7:30 am |
+    | wake me up every weekday at 4:30 am |
     | set an alarm every wednesday at 11 am |
     | set an alarm for weekends at 3 pm |
-    | set an alarm for 3 pm every weekend |
+    | set an alarm for 1 pm every weekend |
 
-  @xfail
   # Jira 68 https://mycroft.atlassian.net/browse/MS-68
-  Scenario Outline: Failing user sets a recurring alarm
+  Scenario Outline: user sets a recurring alarm
     Given an english speaking user
      And there are no previous alarms set
      When the user says "<set a recurring alarm for a time>"
      Then "mycroft-alarm" should reply with dialog from "recurring.alarm.scheduled.for.time.dialog"
 
+  # removed because not currently supported
+  # | wake me up every day at 5:30 am except on the weekends |
   Examples: set a recurring alarm
     | set a recurring alarm for a time |
     | set alarm every weekday at 7:30 am |
-    | alarm every weekday at 7:30 am |
-    | wake me up every day at 7:30 am except on the weekends |
+    | alarm every weekday at 6:30 am |
 
   Scenario Outline: user sets a recurring alarm without saying a time
     Given an english speaking user
@@ -251,9 +245,8 @@ Feature: Alarm skill functionality
     | when will my alarm go off |
     | when's my alarm |
 
-  @xfail
   # Jira 69 https://mycroft.atlassian.net/browse/MS-69
-  Scenario Outline: Failing user asks for alarm status of a single alarm
+  Scenario Outline: user asks for alarm status of a single alarm
     Given an english speaking user
     And there are no previous alarms set
     And an alarm is set for 9:00 am on weekdays
@@ -285,9 +278,8 @@ Feature: Alarm skill functionality
     | when will my alarm go off |
     | when's my alarm |
 
-  @xfail
   # Jira 70 https://mycroft.atlassian.net/browse/MS-70
-  Scenario Outline: Failing user asks for alarm status of multiple alarms
+  Scenario Outline: user asks for alarm status of multiple alarms
     Given an english speaking user
      And there are no previous alarms set
      And an alarm is set for 9:00 am on weekdays
@@ -318,9 +310,8 @@ Feature: Alarm skill functionality
      | when will my alarm go off |
      | when's my alarm |
 
-  @xfail
   # Jira MS-71 https://mycroft.atlassian.net/browse/MS-71
-  Scenario Outline: Failing user asks for alarm status when no alarms are sets
+  Scenario Outline: user asks for alarm status when no alarms are sets
     Given an english speaking user
      And there are no previous alarms set
      When the user says "<alarm status>"
@@ -344,6 +335,7 @@ Feature: Alarm skill functionality
   Examples: stop beeping
     | stop |
     | stop |
+    | kill |
     | stop alarm |
     | disable alarm |
     | cancel |
@@ -354,42 +346,6 @@ Feature: Alarm skill functionality
     | silence |
     | abort |
     | kill alarm |
-
-  @xfail
-  # Jira MS-72 https://mycroft.atlassian.net/browse/MS-72
-  Scenario Outline: user snoozes a beeping alarm
-    Given an english speaking user
-     And there are no previous alarms set
-     And an alarm is expired and beeping
-     When the user says "<snooze>"
-     Then "mycroft-alarm" should stop beeping and start beeping again 10 minutes
-
-  Examples: snooze a beeping alarm
-    | snooze |
-    | snooze |
-    | snooze alarm |
-    | not yet |
-    | 10 more minutes |
-    | 10 minutes |
-    | snooze for 10 minutes |
-    | give me 10 minutes |
-    | wake me up in 10 minutes |
-    | remind me in 10 minutes |
-    | let me sleep |
-
-  @xfail
-  # Jira MS-73 https://mycroft.atlassian.net/browse/MS-73
-  Scenario Outline: user snoozes an beeping alarm for a specific time
-    Given an english speaking user
-     And there are no previous alarms set
-     And an alarm is expired and beeping
-     When the user says "<snooze for a time>"
-     Then "mycroft-alarm" should stop beeping and start beeping again 5 minutes
-
-  Examples: snooze a beeping alarm for a specific time
-    | snooze for a time |
-    | snooze for 5 minutes |
-    | give me 10 minutes |
 
   Scenario Outline: user deletes an alarm when a single alarm is active
     Given an english speaking user
@@ -427,7 +383,6 @@ Feature: Alarm skill functionality
     | cancel |
 
 
-  @xfail
   # Jira MS-74 https://mycroft.atlassian.net/browse/MS-74
   Scenario Outline: user deletes an alarm when multiple alarms are active
     Given an english speaking user
@@ -451,7 +406,6 @@ Feature: Alarm skill functionality
     | abort alarm |
     | remove alarm |
 
-  @xfail
   # Jira MS-75 https://mycroft.atlassian.net/browse/MS-75
   Scenario Outline: user deletes a specific alarm
     Given an english speaking user
@@ -494,3 +448,40 @@ Feature: Alarm skill functionality
     | remove all alarms |
     | remove every alarm |
     | delete every alarm |
+
+# Jira MS-72 https://mycroft.atlassian.net/browse/MS-72
+  Scenario Outline: user snoozes a beeping alarm
+    Given an english speaking user
+     And there are no previous alarms set
+     And an alarm is expired and beeping
+     When the user says "<snooze>"
+     Then "mycroft-alarm" should stop beeping and start beeping again in 10 minutes
+
+  Examples: snooze a beeping alarm
+    | snooze |
+    | snooze |
+    | snooze alarm |
+    | not yet |
+    | 10 more minutes |
+    | 10 minutes |
+    | snooze for 10 minutes |
+    | give me 10 minutes |
+    | wake me up in 10 minutes |
+    | remind me in 10 minutes |
+    | let me sleep |
+
+  # Jira MS-73 https://mycroft.atlassian.net/browse/MS-73
+  Scenario Outline: user snoozes an beeping alarm for a specific time
+    Given an english speaking user
+     And there are no previous alarms set
+     And an alarm is expired and beeping
+     When the user says "<snooze for a time>"
+     Then "mycroft-alarm" should stop beeping and start beeping again in 5 minutes
+
+  Examples: snooze a beeping alarm for a specific time
+    | snooze for a time |
+    | snooze for 5 minutes |
+    | give me 5 minutes |
+    | snooze 5 |
+    | snooze for 5 |
+

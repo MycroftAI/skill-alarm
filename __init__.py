@@ -12,19 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import pytz
 from datetime import datetime, timedelta
 from os.path import join, abspath, dirname, isfile
 import re
 import time
-
 from alsaaudio import Mixer
-
 from adapt.intent import IntentBuilder
 from mycroft import MycroftSkill, intent_handler
-from mycroft.configuration.config import LocalConf, USER_CONFIG
 from mycroft.messagebus.message import Message
 from mycroft.util import play_mp3
-from mycroft.util.format import nice_date_time, nice_time, nice_date, join_list
+from mycroft.util.format import nice_date_time, nice_time, nice_date, join_list, date_time_format
 from mycroft.util.parse import extract_datetime, extract_number
 from mycroft.util.time import to_utc, now_local, now_utc
 
@@ -46,30 +44,12 @@ from .lib.recur import (
     describe_repeat_rule,
 )
 
-
 # WORKING PHRASES/SEQUENCES:
-# Set an alarm
-#    for 9
-#    no for 9 am
-# Set an alarm for tomorrow evening at 8:20
-# Set an alarm for monday morning at 8
-# create an alarm for monday morning at 8
-# snooze
-# stop
-# turn off the alarm
-# create a repeating alarm for tuesdays at 7 am
-# Set a recurring alarm
-# Set a recurring alarm for weekdays at 7
-# snooze for 15 minutes
-# set an alarm for 20 seconds from now
-# Set an alarm every monday at 7
-# "Set a recurring alarm for mondays and wednesdays at 7"
-# "Set an alarm for 10 am every weekday"
+# See VK Tests for requirements/usage.
 # TODO: Context - save the alarm found in queries as context
 #   When is the next alarm
 #   >  7pm tomorrow
 #   Cancel it
-
 
 class AlarmSkill(MycroftSkill):
     """The official Alarm Skill for Mycroft AI."""
@@ -110,7 +90,7 @@ class AlarmSkill(MycroftSkill):
             try:
                 self.mixer = Mixer()
             except Exception as err:
-                self.log.error("Couldn't allocate mixer, {}".format(repr(err)))
+                self.log.warning("Couldn't allocate mixer, {}".format(repr(err)))
                 self.mixer = None
         self.saved_volume = None
 
@@ -162,6 +142,20 @@ class AlarmSkill(MycroftSkill):
 
         # Support query for active alarms from other skills
         self.add_event("private.mycroftai.has_alarm", self.on_has_alarm)
+
+        # establish local timezone from config
+        self.local_tz = self.location_timezone
+        self.log.info("Local timezone configured for %s" % (self.local_tz,))
+
+        self.weekdays = None
+        self.months = None
+        date_time_format.cache(self.lang)
+        if self.lang in date_time_format.lang_config.keys():
+            self.weekdays = list(date_time_format.lang_config[self.lang]['weekday'].values())
+            self.months = list(date_time_format.lang_config[self.lang]['month'].values())
+        if self.weekdays is None or self.months is None:
+            self.log.error("Error! weekdays:%s, months:%s" % (self.weekdays, self.months))
+
 
     def on_has_alarm(self, message):
         """Reply to requests for alarm on/off status."""
@@ -270,7 +264,6 @@ class AlarmSkill(MycroftSkill):
 
     @intent_handler(
         IntentBuilder("")
-        .require("Set")
         .require("Alarm")
         .optionally("Recurring")
         .optionally("Recurrence")
@@ -525,7 +518,7 @@ class AlarmSkill(MycroftSkill):
 
         # No alarms
         if alarms is None or len(alarms) == 0:
-            self.log.error("Cannot get match. No active alarms.")
+            self.log.info("Cannot get match. No active alarms.")
             return (status[2], None)
 
         # Extract Alarm Time
@@ -552,7 +545,28 @@ class AlarmSkill(MycroftSkill):
             time_alarm = to_utc(when).timestamp()
             if is_midnight:
                 time_alarm = time_alarm + 86400.0
+
             time_matches = [a for a in alarms if abs(a["timestamp"] - time_alarm) <= 60]
+
+        # add other categories of alarm matches here
+        utt = self.workaround_lingua_franca(utt)
+        when, utt_no_datetime = extract_datetime(utt) or (None, utt)
+
+        when_utc = None
+        if when is not None:
+            when_utc = to_utc(when)
+
+        have_time = False
+        if when_utc:
+            user_time = when.strftime("%H:%M:%S")
+            if user_time == "00:00:00" and self.voc_match(utt, "Midnight"):
+                have_time = True
+            if user_time != "00:00:00":
+                have_time = True
+
+        user_dow = self.get_dow_from_utterance(utt)
+
+        advanced_matches = self.get_advanced_matches(utt, have_time, when, when_utc, user_dow, alarms)
 
         # Extract Recurrence
         recur = None
@@ -593,6 +607,8 @@ class AlarmSkill(MycroftSkill):
 
         # Find the Intersection of the Alarms list and all the matched alarms
         orig_count = len(alarms)
+        if len(advanced_matches) > 0:
+            alarms = advanced_matches
         if when and time_matches:
             alarms = [a for a in alarms if a in time_matches]
         if recur and recurrence_matches:
@@ -607,6 +623,11 @@ class AlarmSkill(MycroftSkill):
         elif utt and any(fuzzy_match(i, utt, 1) for i in next_words):
             return (status[4], [alarms[0]])
 
+        if max_results < orig_count and len(alarms) == max_results:
+            # if we started with more than we have
+            # and that's how many we asked for
+            return (status[1], alarms)
+
         # Given something to match but no match found
         if (
             (number and number > len(alarms))
@@ -614,8 +635,8 @@ class AlarmSkill(MycroftSkill):
             or (when and not time_matches)
         ):
             return (status[2], None)
-        # If number of alarms filtered were the same, assume user asked for
-        # All alarms
+        # If number of alarms filtered were the same, 
+        # assume user asked for ALL alarms
         if (
             len(alarms) == orig_count
             and max_results > 1
@@ -624,6 +645,7 @@ class AlarmSkill(MycroftSkill):
             and not recur
         ):
             return (status[0], alarms)
+
         # Return immediately if there is ordinal
         if number and number <= len(alarms):
             return (status[1], [alarms[number - 1]])
@@ -640,6 +662,7 @@ class AlarmSkill(MycroftSkill):
             if desc:
                 items_string = join_list(desc, self.translate("and"))
 
+            self.log.debug("Too many alarms, ask for clarification")
             reply = self.get_response(
                 dialog,
                 data={
@@ -648,7 +671,15 @@ class AlarmSkill(MycroftSkill):
                 },
                 num_retries=1,
             )
+
             if reply:
+                # if user wants to bail, bail!
+                # TODO - consider use of global "cancel.voc" to make
+                # cancelling experience consistent across Mycroft.
+                if self.voc_match(utt, "Terminate"):
+                    self.log.debug("user cancels the select request")
+                    return (status[3], None)
+
                 return self._get_alarm_matches(
                     reply,
                     alarm=alarms,
@@ -661,6 +692,143 @@ class AlarmSkill(MycroftSkill):
 
         # No matches found
         return (status[2], None)
+
+    # sometimes LF returns a roman numeral for
+    # a number so the 26th will return xxvi
+    def roman_to_int(self, s):
+        rom_val = {'I': 1, 'V': 5, 'X': 10, 'L': 50, 'C': 100, 'D': 500, 'M': 1000}
+        int_val = 0
+        for i in range(len(s)):
+            if i > 0 and rom_val[s[i]] > rom_val[s[i - 1]]:
+                int_val += rom_val[s[i]] - 2 * rom_val[s[i - 1]]
+            else:
+                int_val += rom_val[s[i]]
+        return int_val
+
+    def get_advanced_matches(self, utt, have_time, when, when_utc, user_dow, alarm_list):
+        '''see if we have any of the following 
+           in order of preference
+           exact matches
+           date matches 
+           time of day matches (tod)
+           day of week matches (dow)
+           day of month matches (dom)
+        '''
+        # holds exact date and time matches
+        exact_matches = []
+        dom = None
+        try:
+            dom = self.roman_to_int(utt)
+        except:
+            self.log.debug("Not a roman numeral")
+
+        if dom is None:
+            dom = extract_number(utt)
+
+        # if the user says a day of the week (mon-sun) we 
+        # keep them in a separate list of day of week matches
+        dow_matches = []
+
+        # we also look for specific time matches like 9am
+        tod_matches = []
+        if when_utc:
+            tod_matches = self.get_tod_matches(when.time(), alarm_list)
+
+        # these alarms match our when_utc date only
+        date_matches = []
+
+        # these alarms match any numbers passed in like
+        # the 25th, 5 etc which we assume are dom
+        # hopefully this won't muss up ordinals
+        dom_matches = []
+
+        for alm in alarm_list:
+            self.log.debug("    Loop: %s" % (alm,))
+
+            # get utc time from alarm timestamp
+            dt_obj = datetime.fromtimestamp( alm['timestamp'] )
+            dt_obj = dt_obj.astimezone(pytz.utc)
+
+            # we also need a local version of our utc time
+            cfg_tz = pytz.timezone(self.local_tz) 
+            dt_local = dt_obj.astimezone(cfg_tz)
+
+            if user_dow == dt_local.weekday():
+                dow_matches.append(alm)
+
+            if dom == dt_local.day:
+                dom_matches.append(alm)
+
+            if have_time:
+                # unambiguous
+                if when_utc == dt_obj:
+                    exact_matches.append(alm)
+            else:
+                self.log.debug("    Loop: when:%s, dt_obj:%s" % (when_utc, dt_obj))
+                if when_utc is not None and dt_obj is not None:    
+                    # do dates match ?
+                    if when_utc.strftime("%y-%m-%d") == dt_obj.strftime("%y-%m-%d"):
+                        date_matches.append(alm)
+
+        if len(exact_matches) > 0:
+            return exact_matches
+
+        if len(date_matches) > 0:
+            return date_matches
+
+        if len(tod_matches) > 0:
+            return tod_matches
+
+        if len(dow_matches) > 0:
+            return dow_matches
+
+        return dom_matches
+
+    def get_tod_matches(self, alarm_time, alarm_list):
+        ''' find alarms where the time matches'''
+        tod_matches = []
+
+        for alarm in alarm_list:
+            # get utc time from alarm timestamp
+            dt_obj = datetime.fromtimestamp( alarm['timestamp'] )
+            dt_obj = dt_obj.astimezone(pytz.utc)
+
+            # we also need a local version of our utc time
+            cfg_tz = pytz.timezone(self.local_tz) 
+            dt_local = dt_obj.astimezone(cfg_tz)
+
+            self.log.debug("Check for TOD matches, dt_local.time()=%s" % (dt_local.time(),))
+            if dt_local.time() == alarm_time:
+                tod_matches.append(alarm)
+
+        return tod_matches
+
+    def get_dow_from_utterance(self, utt):
+        user_dow = None
+        result = re.findall('(mon|tues|wed|thurs|fri|sat|sun)day', utt)
+        if result:
+            utt_dow = result[0] + 'day'
+            user_dow = self.weekdays.index(utt_dow) if utt_dow in self.weekdays else None
+        return user_dow
+
+    def workaround_lingua_franca(self, utt):
+        # Lingua-franca workaround - day of 
+        # week and date confuses LF terribly. 
+        # if a day of the week (monday, friday, 
+        # etc) is included with a valid date
+        # like "monday april 5th" LF will 
+        # return bad data so we make sure 
+        # we never include both. "monday 
+        # april 5th" becomes "april 5th".
+
+        for month in self.months:
+            if utt.find(month) > -1 and re.search(r'\d+', utt):
+                # if we have a month and a number/day
+                # whack any days of week terms
+                for day in self.weekdays:
+                    utt = utt.replace(day,'')
+
+        return utt
 
     @intent_handler(
         IntentBuilder("")
@@ -690,6 +858,10 @@ class AlarmSkill(MycroftSkill):
             is_response=False,
         )
 
+        if status == "User Cancelled":
+            self.speak_dialog("alarm.delete.cancelled")
+            return
+
         if alarms:
             total = len(alarms)
         else:
@@ -698,6 +870,7 @@ class AlarmSkill(MycroftSkill):
         if total == 1:
             desc = self._describe(alarms[0])
             recurring = ".recurring" if alarms[0]["repeat_rule"] else ""
+
             if (
                 self.ask_yesno("ask.cancel.desc.alarm" + recurring, data={"desc": desc})
                 == "yes"
@@ -739,11 +912,14 @@ class AlarmSkill(MycroftSkill):
         if not has_expired_alarm(self.settings["alarm"]):
             return
 
+        self.cancel_scheduled_event("Beep")
+        self.cancel_scheduled_event("NextAlarm")
+
         self.__end_beep()
         self.__end_flash()
 
         utt = message.data.get("utterance") or ""
-        snooze_for = extract_number(utt)
+        snooze_for = extract_number(utt[0])
         if not snooze_for or snooze_for < 1:
             snooze_for = 9  # default to 9 minutes
 
@@ -784,8 +960,18 @@ class AlarmSkill(MycroftSkill):
         """While an alarm is expired, check all utterances for Stop vocab."""
         if has_expired_alarm(self.settings["alarm"]):
             if utterances and self.voc_match(utterances[0], "StopBeeping"):
-                self._stop_expired_alarm()
-                return True  # and consume this phrase
+                self._stop_expired_alarm()  
+            elif self.voc_match(utterances[0], "Snooze"):
+                message = Message(
+                  "internal.snooze",
+                  data=dict(utterance=utterances)
+                  )
+                self.snooze_alarm(message)
+            else:
+                # TODO deal with this
+                self.log.info("AlarmSkill:Converse confused by %s" % (utterances[0],))
+
+            return True  # and consume this phrase
 
     def stop(self, _=None):
         """Respond to system stop commands."""
@@ -798,6 +984,8 @@ class AlarmSkill(MycroftSkill):
     def _play_beep(self, _=None):
         """ Play alarm sound file """
         now = now_local()
+
+        self.bus.emit(Message("mycroft.alarm.beeping", data=dict(time=now.strftime("%m/%d/%Y, %H:%M:%S"))))
 
         if not self.beep_start_time:
             self.beep_start_time = now
@@ -868,28 +1056,6 @@ class AlarmSkill(MycroftSkill):
                 pass
             self.beep_process = None
         self._restore_volume()
-        self._restore_listen_beep()
-
-    def _restore_listen_beep(self):
-        if "user_beep_setting" in self.settings:
-            # Wipe from local config
-            new_conf_values = {"confirm_listening": False}
-            user_config = LocalConf(USER_CONFIG)
-
-            if (
-                self.settings["user_beep_setting"] is None
-                and "confirm_listening" in user_config
-            ):
-                del user_config["confirm_listening"]
-            else:
-                user_config.merge(
-                    {"confirm_listening": self.settings["user_beep_setting"]}
-                )
-            user_config.store()
-
-            # Notify all processes to update their loaded configs
-            self.bus.emit(Message("configuration.updated"))
-            del self.settings["user_beep_setting"]
 
     def _stop_expired_alarm(self):
         if has_expired_alarm(self.settings["alarm"]):
