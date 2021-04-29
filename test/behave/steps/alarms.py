@@ -76,8 +76,8 @@ def then_stop_beeping(context):
     pass
 
 
-@then('"mycroft-alarm" should stop beeping and start beeping again in 10 minutes')
-def then_stop_and_start_beeping(context):
+@then('"mycroft-alarm" should stop beeping and start beeping again in {snooze_duration} minutes')
+def then_stop_and_start_beeping(context, snooze_duration):
     start_time = time.time()
     got_msg = False
 
@@ -86,7 +86,7 @@ def then_stop_and_start_beeping(context):
         pass
 
     ctr = 0
-    while ctr < 3 and not got_msg:
+    while ctr < snooze_duration + 2 and not got_msg:
         time.sleep(60)
 
         # wait for msg = beeping
@@ -97,33 +97,6 @@ def then_stop_and_start_beeping(context):
 
     elapsed = time.time() - start_time
     context.bus.clear_messages()
-    #assert got_msg and elapsed > 5*60, "Error, did not get beeping message!"
-    assert got_msg, "Error, did not get beeping message!"
-
-
-@then('"mycroft-alarm" should stop beeping and start beeping again in 5 minutes')
-def then_stop_and_start_beeping(context):
-    start_time = time.time()
-    got_msg = False
-
-    # drain any existing messages
-    for message in context.bus.get_messages('mycroft.alarm.beeping'):
-        pass
-
-    ctr = 0
-    while ctr < 7 and not got_msg:
-        time.sleep(60)
-
-        # wait for msg = beeping
-        for message in context.bus.get_messages('mycroft.alarm.beeping'):
-            got_msg = True
-
-        ctr += 1
-
-    elapsed = time.time() - start_time
-    context.bus.clear_messages()
-    # TODO assert got msg and > 3 minutes!
-    #assert got_msg and elapsed > 3*60, "Error, did not get beeping message!"
-    assert got_msg, "Error, did not get beeping message!"
-
+    assert got_msg and elapsed > (snooze_duration-1)*60, "Error, did not get beeping message!"
+    # assert got_msg, "Error, did not get beeping message!"
 
