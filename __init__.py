@@ -674,6 +674,8 @@ class AlarmSkill(MycroftSkill):
 
             if reply:
                 # if user wants to bail, bail!
+                # TODO - consider use of global "cancel.voc" to make
+                # cancelling experience consistent across Mycroft.
                 if self.voc_match(utt, "Terminate"):
                     self.log.debug("user cancels the select request")
                     return (status[3], None)
