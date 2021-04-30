@@ -5,20 +5,16 @@ import Mycroft 1.0 as Mycroft
 import org.kde.kirigami 2.11 as Kirigami
 import QtGraphicalEffects 1.0
 
-Mycroft.Delegate {
+Mycroft.CardDelegate {
     id: root
-    skillBackgroundColorOverlay: "black"
     property bool alarmExpired: sessionData.alarmExpired
     property color alarmColor: alarmExpired ? "#FFFFFF" : "#22A7F0"
-    leftPadding: 0
-    rightPadding: 0
-    topPadding: 0
-    bottomPadding: 0
+    cardBackgoundOverlayColor: "black"
     
     Rectangle {
         id: leftRect
         anchors.top: parent.top
-        anchors.topMargin: Math.round(centerRect.height * 0.085)
+        anchors.topMargin: Mycroft.Units.gridUnit - 2
         anchors.right: centerRect.left
         anchors.rightMargin: Math.round(-centerRect.width * 0.340)
         color: alarmColor
@@ -34,7 +30,7 @@ Mycroft.Delegate {
     Rectangle {
         id: rightRect
         anchors.top: parent.top
-        anchors.topMargin: Math.round(centerRect.height * 0.085)
+        anchors.topMargin: Mycroft.Units.gridUnit - 2
         anchors.left: centerRect.right
         anchors.leftMargin: Math.round(-centerRect.width * 0.340)
         color: alarmColor
@@ -55,10 +51,10 @@ Mycroft.Delegate {
         anchors.leftMargin: -centerRect.width * 0.20
         color: alarmColor
         radius: 30
-        rotation: -50
+        rotation: -48
         z: 2
         width: centerRect.width * 0.16
-        height: centerRect.height * 0.25
+        height: centerRect.height * 0.28
     }
 
     Rectangle {
@@ -69,20 +65,20 @@ Mycroft.Delegate {
         anchors.rightMargin: -centerRect.width * 0.20
         color: alarmColor
         radius: 30
-        rotation: 50
+        rotation: 48
         z: 2
         width: centerRect.width * 0.16
-        height: centerRect.height * 0.25
+        height: centerRect.height * 0.28
     }
 
     Rectangle {
         id: centerRect
         anchors.top: parent.top
-        anchors.topMargin: Kirigami.Units.largeSpacing + Kirigami.Units.smallSpacing
+        anchors.topMargin: Mycroft.Units.gridUnit + 5
         anchors.horizontalCenter: parent.horizontalCenter
         color: "black"
         radius: width
-        width: Math.min(Math.round(parent.width / 2.1050), 800)
+        width: Math.min(Math.round(parent.width / 2.480), 800)
         height: width
 
         Rectangle {
@@ -99,16 +95,16 @@ Mycroft.Delegate {
 
                 Label {
                     id: timeI
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.centerIn: parent
                     font.weight: Font.ExtraBold
-                    font.pixelSize: parent.height * 0.375
-                    color: "black"
-                    font.family: "Noto Sans SemiBold"
+                    font.pixelSize: timeI.text.length > 4 ? parent.width * 0.35 : parent.width * 0.40
+                    color: sessionData.alarmExpired ? "black" : "white"
+                    font.family: "Noto Sans Display"
+                    font.styleName: "bold"
                     font.letterSpacing: 2
                     text: sessionData.alarmTime.split(" ")[0]
                     z: 100
-                    
+
                     SequentialAnimation on opacity {
                         id: expireAnimation
                         running: alarmExpired
@@ -130,16 +126,17 @@ Mycroft.Delegate {
                 Label {
                     id: ampm
                     anchors.top: timeI.baseline
-                    anchors.topMargin: 24
+                    anchors.topMargin: 15
                     anchors.horizontalCenter: parent.horizontalCenter
                     font.weight: Font.Bold
                     font.family: "Noto Sans Display"
-                    font.pixelSize: parent.height * 0.14
+                    font.styleName: "bold"
+                    font.pixelSize: parent.height * 0.175
                     font.letterSpacing: 2
-                    color: "black"
+                    color: sessionData.alarmExpired ? "black" : "white"
                     text: sessionData.alarmTime.split(" ")[1]
                     z: 100
-                    
+
                     SequentialAnimation on opacity {
                         id: expireAnimation2
                         running: alarmExpired
@@ -162,9 +159,10 @@ Mycroft.Delegate {
     }
 
     Rectangle {
+        id: alarmLabelBox
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: Kirigami.Units.largeSpacing + Kirigami.Units.smallSpacing
+        anchors.bottomMargin: Mycroft.Units.gridUnit * 2 - 5
         width: centerRect.width
         color: "transparent"
         height: alarmLabel.contentHeight
@@ -177,11 +175,11 @@ Mycroft.Delegate {
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             font.weight: Font.Bold
-            font.family: "Noto Sans Display SemiBold"
+            font.family: "Noto Sans Display"
+            font.styleName: "SemiBold"
             font.pixelSize: parent.width * 0.12
             font.letterSpacing: 2
             text: sessionData.alarmName
         }
     }
 }
- 
