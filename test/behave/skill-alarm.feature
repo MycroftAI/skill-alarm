@@ -494,3 +494,25 @@ Feature: Alarm skill functionality
     | remove all alarms |
     | remove every alarm |
     | delete every alarm |
+
+Scenario Outline: user snoozes an alarm and then plays the news
+    Given an english speaking user
+     And there are no previous alarms set
+     And an alarm is expired and beeping
+     When the user says "<snooze>"
+     Then "mycroft-alarm" should stop beeping and start beeping again 10 minutes
+     And the user says "play the news"
+     And "skill-npr-news" should reply with dialog from "news.dialog"
+
+  Examples: delete an alarm when multiple alarm are active
+    | snooze |
+    | snooze |
+    | snooze alarm |
+    | not yet |
+    | 10 more minutes |
+    | 10 minutes |
+    | snooze for 10 minutes |
+    | give me 10 minutes |
+    | wake me up in 10 minutes |
+    | remind me in 10 minutes |
+    | let me sleep |
