@@ -512,7 +512,6 @@ Scenario Outline: user snoozes an alarm and then plays the news
     | 10 more minutes |
     | 10 minutes |
     | snooze for 10 minutes |
-    | give me 10 minutes |
     | wake me up in 10 minutes |
     | remind me in 10 minutes |
     | let me sleep |
