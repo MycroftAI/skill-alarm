@@ -708,7 +708,7 @@ class AlarmSkill(MycroftSkill):
                 self.speak_dialog(
                     "alarm.cancelled.desc" + recurring, data={"desc": desc}
                 )
-                self.gui.remove_page("alarm.qml")
+                self.gui.release()
                 return
             else:
                 self.speak_dialog("alarm.delete.cancelled")
@@ -725,7 +725,7 @@ class AlarmSkill(MycroftSkill):
                 ]
                 self._schedule()
                 self.speak_dialog("alarm.cancelled.multi", data={"count": total})
-                self.gui.remove_page("alarm.qml")
+                self.gui.release()
             return
         elif not total:
             # Failed to delete
@@ -903,7 +903,7 @@ class AlarmSkill(MycroftSkill):
             self.settings["alarm"] = curate_alarms(
                 self.settings["alarm"], 0
             )  # end any expired alarm
-            self.gui.remove_page("alarm.qml")
+            self.gui.release()
             self._schedule()
             return True
         else:
