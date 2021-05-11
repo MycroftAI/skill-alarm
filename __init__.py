@@ -1023,7 +1023,8 @@ class AlarmSkill(MycroftSkill):
                                           use_ampm=True)
         self.gui["alarmName"] = alarm_name.title()
         self.gui["alarmExpired"] = alarm_exp
-        self.gui.show_page("alarm.qml")
+        override_idle = True if alarm_exp else False
+        self.gui.show_page("alarm.qml", override_idle=override_idle)
 
 
 def create_skill():
