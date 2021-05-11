@@ -375,8 +375,8 @@ class AlarmSkill(MycroftSkill):
                     data={"time": alarm_nice_time, "rel": reltime},
                 )
 
-        self._show_alarm_anim(alarm_time)
         self._show_alarm_ui(alarm_time, name)
+        self._show_alarm_anim(alarm_time)
         self.enclosure.activate_mouth_events()
 
     def _get_alarm_name(self, utt):
