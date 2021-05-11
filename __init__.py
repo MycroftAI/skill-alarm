@@ -1021,7 +1021,7 @@ class AlarmSkill(MycroftSkill):
     def _show_alarm_ui(self, alarm_dt, alarm_name, alarm_exp=False):
         self.gui["alarmTime"] = nice_time(alarm_dt, speech=False,
                                           use_ampm=True)
-        self.gui["alarmName"] = alarm_name
+        self.gui["alarmName"] = alarm_name.title()
         self.gui["alarmExpired"] = alarm_exp
         self.gui.show_page("alarm.qml")
 
