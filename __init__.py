@@ -68,6 +68,8 @@ class AlarmSkill(MycroftSkill):
         self.recurrence_dict = None
         self.sound_name = None
         self.skill_control.category = 'system'
+        self.weekdays = None
+        self.months = None
 
         # Seconds of gap between sound repeats.
         # The value name must match an option from the 'sound' value of the
@@ -150,8 +152,6 @@ class AlarmSkill(MycroftSkill):
         self.local_tz = self.location_timezone
         self.log.info("Local timezone configured for %s" % (self.local_tz,))
 
-        self.weekdays = None
-        self.months = None
         date_time_format.cache(self.lang)
         if self.lang in date_time_format.lang_config.keys():
             self.weekdays = list(date_time_format.lang_config[self.lang]['weekday'].values())
@@ -577,9 +577,7 @@ class AlarmSkill(MycroftSkill):
         utt = self.workaround_lingua_franca(utt)
         when, utt_no_datetime = extract_datetime(utt) or (None, utt)
 
-        when_utc = None
-        if when is not None:
-            when_utc = to_utc(when)
+        when_utc = None if when is None else to_utc(when)
 
         have_time = False
         if when_utc:
@@ -1095,7 +1093,6 @@ class AlarmSkill(MycroftSkill):
         self._restore_volume()
 
     def _stop_expired_alarm(self):
-        self.log.error("STOP EXPIRED ALARM CALLED!, has_expired_alarm(self.settings[\"alarm\"])=%s" % (has_expired_alarm(self.settings["alarm"]),))
         if has_expired_alarm(self.settings["alarm"]):
             self.__end_beep()
             self.__end_flash()
