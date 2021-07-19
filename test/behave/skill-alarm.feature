@@ -495,6 +495,7 @@ Feature: Alarm skill functionality
     | remove every alarm |
     | delete every alarm |
 
+@xfail
 Scenario Outline: user snoozes an alarm and then plays the news
     Given an english speaking user
      And there are no previous alarms set

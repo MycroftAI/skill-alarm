@@ -31,8 +31,8 @@ def given_no_alarms(context):
         for message in context.bus.get_messages('speak'):
             if message.data.get('meta', {}).get('dialog') in followups:
                 print('Answering yes!')
-                time.sleep(1)
                 wait_while_speaking()
+                time.sleep(2)
                 emit_utterance(context.bus, 'yes')
                 wait_for_dialog(context.bus, cancelled)
                 context.bus.clear_messages()
