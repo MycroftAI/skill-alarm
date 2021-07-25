@@ -24,7 +24,7 @@ from mycroft import MycroftSkill, intent_handler
 from mycroft.configuration.config import LocalConf, USER_CONFIG
 from mycroft.messagebus.message import Message
 from mycroft.util import play_mp3
-from mycroft.util.format import nice_date_time, nice_time, nice_date, join_list
+from mycroft.util.format import nice_date_time, nice_time, nice_date, join_list, nice_relative_time
 from mycroft.util.parse import extract_datetime, extract_number
 from mycroft.util.time import to_utc, now_local, now_utc
 
@@ -37,7 +37,6 @@ from .lib.alarm import (
     get_next_repeat,
     has_expired_alarm,
 )
-from .lib.format import nice_relative_time
 from .lib.parse import fuzzy_match, utterance_has_midnight
 from .lib.recur import (
     create_day_set,
