@@ -375,6 +375,7 @@ class AlarmSkill(MycroftSkill):
                     data={"time": alarm_nice_time, "rel": reltime},
                 )
 
+        self._show_alarm_ui(alarm_time, name)
         self._show_alarm_anim(alarm_time)
         self.enclosure.activate_mouth_events()
 
@@ -707,6 +708,7 @@ class AlarmSkill(MycroftSkill):
                 self.speak_dialog(
                     "alarm.cancelled.desc" + recurring, data={"desc": desc}
                 )
+                self.gui.release()
                 return
             else:
                 self.speak_dialog("alarm.delete.cancelled")
@@ -723,6 +725,7 @@ class AlarmSkill(MycroftSkill):
                 ]
                 self._schedule()
                 self.speak_dialog("alarm.cancelled.multi", data={"count": total})
+                self.gui.release()
             return
         elif not total:
             # Failed to delete
@@ -900,6 +903,7 @@ class AlarmSkill(MycroftSkill):
             self.settings["alarm"] = curate_alarms(
                 self.settings["alarm"], 0
             )  # end any expired alarm
+            self.gui.release()
             self._schedule()
             return True
         else:
@@ -937,6 +941,10 @@ class AlarmSkill(MycroftSkill):
             name="Flash",
             data={"alarm_time": alarm["timestamp"]},
         )
+        alarm_timestamp = alarm.get("timestamp", "")
+        alarm_dt = get_alarm_local(timestamp=alarm_timestamp)
+        alarm_name = alarm.get("name", "")
+        self._show_alarm_ui(alarm_dt, alarm_name, alarm_exp=True)
 
     def __end_flash(self):
         self.cancel_scheduled_event("Flash")
@@ -1009,6 +1017,14 @@ class AlarmSkill(MycroftSkill):
             png = join(abspath(dirname(__file__)), "anim", png)
             self.enclosure.mouth_display_png(png, x=x, y=2, refresh=False)
             x += w
+
+    def _show_alarm_ui(self, alarm_dt, alarm_name, alarm_exp=False):
+        self.gui["alarmTime"] = nice_time(alarm_dt, speech=False,
+                                          use_ampm=True)
+        self.gui["alarmName"] = alarm_name.title()
+        self.gui["alarmExpired"] = alarm_exp
+        override_idle = True if alarm_exp else False
+        self.gui.show_page("alarm.qml", override_idle=override_idle)
 
 
 def create_skill():
