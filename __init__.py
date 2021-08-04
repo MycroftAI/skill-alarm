@@ -1055,6 +1055,12 @@ class AlarmSkill(MycroftSkill):
         """
         return self.settings["alarm"]
 
+    @skill_api_method
+    def is_alarm_expired(self):
+        """Check if an alarm is currently expired and beeping."""
+        return has_expired_alarm(self.settings["alarm"])
+
+
 def create_skill():
     """Create the Alarm Skill for Mycroft."""
     return AlarmSkill()
