@@ -32,5 +32,7 @@ def given_expired_alarm(context):
 
 @then('"mycroft-alarm" should stop beeping')
 def then_stop_beeping(context):
-    # TODO Implement
-    pass
+    time.sleep(2)
+    SkillApi.connect_bus(context.bus)
+    alarm_skill = SkillApi.get('mycroft-alarm.mycroftai')
+    assert(not alarm_skill.is_alarm_expired())
