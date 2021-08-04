@@ -3,6 +3,7 @@ import time
 from behave import given, then
 
 from mycroft.audio import wait_while_speaking
+from mycroft.skills.api import SkillApi
 
 from test.integrationtests.voight_kampff import emit_utterance, wait_for_dialog
 
@@ -16,32 +17,9 @@ def given_set_alarm(context, alarm_time):
 
 @given('there are no previous alarms set')
 def given_no_alarms(context):
-    followups = ['ask.cancel.alarm.plural',
-                 'ask.cancel.desc.alarm',
-                 'ask.cancel.desc.alarm.recurring']
-    no_alarms = ['alarms.list.empty']
-    cancelled = ['alarm.cancelled.desc',
-                 'alarm.cancelled.desc.recurring',
-                 'alarm.cancelled.multi',
-                 'alarm.cancelled.recurring']
-
-    print('ASKING QUESTION')
-    emit_utterance(context.bus, 'cancel all alarms')
-    for i in range(10):
-        for message in context.bus.get_messages('speak'):
-            if message.data.get('meta', {}).get('dialog') in followups:
-                print('Answering yes!')
-                wait_while_speaking()
-                time.sleep(2)
-                emit_utterance(context.bus, 'yes')
-                wait_for_dialog(context.bus, cancelled)
-                context.bus.clear_messages()
-                return
-            elif message.data.get('meta', {}).get('dialog') in no_alarms:
-                context.bus.clear_messages()
-                return
-        time.sleep(1)
-    context.bus.clear_messages()
+    SkillApi.connect_bus(context.bus)
+    alarm_skill = SkillApi.get('mycroft-alarm.mycroftai')
+    alarm_skill.delete_all_alarms()
 
 
 @given('an alarm is expired and beeping')
