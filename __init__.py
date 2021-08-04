@@ -1039,6 +1039,21 @@ class AlarmSkill(MycroftSkill):
         else:
             return False
 
+    @skill_api_method
+    def get_active_alarms(self):
+        """Get list of active alarms.
+
+        This includes any alarms that are in an expired state.
+
+        Returns:
+            List of alarms as Objects: {
+                "timestamp" (float): POSIX timestamp of next alarm expiry
+                "repeat_rule" (str): iCal repeat rule
+                "name" (str): Alarm name
+                "snooze" (float): [optional] POSIX timestamp if alarm was snoozed
+            }
+        """
+        return self.settings["alarm"]
 
 def create_skill():
     """Create the Alarm Skill for Mycroft."""
