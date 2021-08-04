@@ -24,8 +24,8 @@ def given_no_alarms(context):
 
 @given('an alarm is expired and beeping')
 def given_expired_alarm(context):
-    emit_utterance(context.bus, 'set an alarm in 30 seconds')
-    time.sleep(30)
+    emit_utterance(context.bus, 'set an alarm in 10 seconds')
+    time.sleep(12)
 
 
 @then('"mycroft-alarm" should stop beeping')
