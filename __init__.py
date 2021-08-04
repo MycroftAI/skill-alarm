@@ -1035,6 +1035,7 @@ class AlarmSkill(MycroftSkill):
         """Delete all stored alarms."""
         if len(self.settings["alarm"]) > 0:
             self.settings["alarm"] = []
+            self._schedule()
             return True
         else:
             return False
