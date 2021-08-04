@@ -23,6 +23,7 @@ from adapt.intent import IntentBuilder
 from mycroft import MycroftSkill, intent_handler
 from mycroft.configuration.config import LocalConf, USER_CONFIG
 from mycroft.messagebus.message import Message
+from mycroft.skills import skill_api_method
 from mycroft.util import play_mp3
 from mycroft.util.format import nice_date_time, nice_time, nice_date, join_list
 from mycroft.util.parse import extract_datetime, extract_number
@@ -1025,6 +1026,18 @@ class AlarmSkill(MycroftSkill):
         self.gui["alarmExpired"] = alarm_exp
         override_idle = True if alarm_exp else False
         self.gui.show_page("alarm.qml", override_idle=override_idle)
+
+    ##########################################################################
+    # Public Skill API Methods
+
+    @skill_api_method
+    def delete_all_alarms(self):
+        """Delete all stored alarms."""
+        if len(self.settings["alarm"]) > 0:
+            self.settings["alarm"] = []
+            return True
+        else:
+            return False
 
 
 def create_skill():
