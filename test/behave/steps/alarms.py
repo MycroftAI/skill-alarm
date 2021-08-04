@@ -20,6 +20,8 @@ def given_no_alarms(context):
     SkillApi.connect_bus(context.bus)
     alarm_skill = SkillApi.get('mycroft-alarm.mycroftai')
     alarm_skill.delete_all_alarms()
+    active_alarms = alarm_skill.get_active_alarms()
+    assert(len(active_alarms) == 0)
 
 
 @given('an alarm is expired and beeping')
