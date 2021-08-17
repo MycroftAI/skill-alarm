@@ -21,6 +21,7 @@ from alsaaudio import Mixer
 from adapt.intent import IntentBuilder
 from mycroft import MycroftSkill, intent_handler
 from mycroft.messagebus.message import Message
+from mycroft.skills import skill_api_method
 from mycroft.util import play_mp3
 from mycroft.util.format import nice_date_time, nice_time, nice_date, join_list, date_time_format
 from mycroft.util.parse import extract_datetime, extract_number
@@ -1228,6 +1229,40 @@ class AlarmSkill(MycroftSkill):
         self.gui["alarmExpired"] = alarm_exp
         override_idle = True if alarm_exp else False
         self.gui.show_page("alarm.qml", override_idle=override_idle)
+
+    ##########################################################################
+    # Public Skill API Methods
+
+    @skill_api_method
+    def delete_all_alarms(self):
+        """Delete all stored alarms."""
+        if len(self.settings["alarm"]) > 0:
+            self.settings["alarm"] = []
+            self._schedule()
+            return True
+        else:
+            return False
+
+    @skill_api_method
+    def get_active_alarms(self):
+        """Get list of active alarms.
+
+        This includes any alarms that are in an expired state.
+
+        Returns:
+            List of alarms as Objects: {
+                "timestamp" (float): POSIX timestamp of next alarm expiry
+                "repeat_rule" (str): iCal repeat rule
+                "name" (str): Alarm name
+                "snooze" (float): [optional] POSIX timestamp if alarm was snoozed
+            }
+        """
+        return self.settings["alarm"]
+
+    @skill_api_method
+    def is_alarm_expired(self):
+        """Check if an alarm is currently expired and beeping."""
+        return has_expired_alarm(self.settings["alarm"])
 
 
 def create_skill():

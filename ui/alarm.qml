@@ -9,7 +9,7 @@ Mycroft.CardDelegate {
     id: root
     property bool alarmExpired: sessionData.alarmExpired
     property color alarmColor: alarmExpired ? "#FFFFFF" : "#22A7F0"
-    cardBackgoundOverlayColor: "black"
+    cardBackgroundOverlayColor: "black"
     
     Rectangle {
         id: leftRect

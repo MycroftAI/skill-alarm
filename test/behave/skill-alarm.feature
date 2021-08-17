@@ -11,7 +11,6 @@ Feature: Alarm skill functionality
     | set alarm for 8 am |
     | set an alarm for 7:30 am |
     | create an alarm for 7:30 am |
-    | start an alarm for 6:30 am |
     | let me know when it's 8:30 pm |
     | wake me up at 7 tomorrow morning |
 
@@ -27,6 +26,7 @@ Feature: Alarm skill functionality
     | set alarm for a time |
     | alarm 6 pm |
     | alarm for 8 tonight |
+    | start an alarm for 6:30 am |
 
   Scenario Outline: user sets an alarm without saying a time
     Given an english speaking user
@@ -495,6 +495,7 @@ Feature: Alarm skill functionality
     | remove every alarm |
     | delete every alarm |
 
+@xfail
 Scenario Outline: user snoozes an alarm and then plays the news
     Given an english speaking user
      And there are no previous alarms set
