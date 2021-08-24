@@ -163,17 +163,11 @@ class AlarmSkill(MycroftSkill):
 
         # Support query for active alarms from other skills
         self.add_event("private.mycroftai.has_alarm", self.on_has_alarm)
-        self.add_event("skill.alarm.query-active", self.handle_active_alarm_query)
 
     def on_has_alarm(self, message):
         """Reply to requests for alarm on/off status."""
         total = len(self.settings["alarm"])
         self.bus.emit(message.response(data={"active_alarms": total}))
-
-    def handle_active_alarm_query(self, _):
-        event_data = {"active_alarms": bool(self.settings["alarm"])}
-        event = Message("skill.alarm.active-queried", data=event_data)
-        self.bus.emit(event)
 
     def set_alarm(self, when, name=None, repeat=None):
         """Set an alarm at the specified datetime."""
@@ -212,9 +206,6 @@ class AlarmSkill(MycroftSkill):
             self.schedule_event(
                 self._alarm_expired, to_system(alarm_dt), name="NextAlarm"
             )
-        event_data = {"active_alarms": bool(self.settings["alarm"])}
-        event = Message("skill.alarm.scheduled", data=event_data)
-        self.bus.emit(event)
 
     def _get_recurrence(self, utterance: str):
         """Get recurrence pattern from user utterance."""
