@@ -171,6 +171,7 @@ class AlarmSkill(MycroftSkill):
         self.bus.emit(message.response(data={"active_alarms": total}))
 
     def handle_active_alarm_query(self, _):
+        """Event handler for the skill.alarm.query-active command."""
         event_data = {"active_alarms": bool(self.settings["alarm"])}
         event = Message("skill.alarm.active-queried", data=event_data)
         self.bus.emit(event)
