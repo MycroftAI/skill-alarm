@@ -161,19 +161,26 @@ class AlarmSkill(MycroftSkill):
 
         self._schedule()
 
-        # Support query for active alarms from other skills
+        # TODO: remove the "private.mycroftai.has_alarm" event in favor of the
+        #   "skill.alarm.query-active" event.
         self.add_event("private.mycroftai.has_alarm", self.on_has_alarm)
         self.add_event("skill.alarm.query-active", self.handle_active_alarm_query)
 
+    # TODO: remove the "private.mycroftai.has_alarm" event in favor of the
+    #   "skill.alarm.query-active" event.
     def on_has_alarm(self, message):
         """Reply to requests for alarm on/off status."""
         total = len(self.settings["alarm"])
         self.bus.emit(message.response(data={"active_alarms": total}))
 
     def handle_active_alarm_query(self, _):
-        """Event handler for the skill.alarm.query-active command."""
+        """Emits an event indicating whether or not there are any active alarms.
+
+        In this case, an "active alarm" is defined as any alarms that exist for a time
+        in the future.
+        """
         event_data = {"active_alarms": bool(self.settings["alarm"])}
-        event = Message("skill.alarm.active-queried", data=event_data)
+        event = Message("", data=event_data)
         self.bus.emit(event)
 
     def set_alarm(self, when, name=None, repeat=None):
