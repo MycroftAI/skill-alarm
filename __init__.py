@@ -180,7 +180,7 @@ class AlarmSkill(MycroftSkill):
         in the future.
         """
         event_data = {"active_alarms": bool(self.settings["alarm"])}
-        event = Message("", data=event_data)
+        event = Message("skill.alarm.active-queried", data=event_data)
         self.bus.emit(event)
 
     def set_alarm(self, when, name=None, repeat=None):
