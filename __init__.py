@@ -173,14 +173,14 @@ class AlarmSkill(MycroftSkill):
         total = len(self.settings["alarm"])
         self.bus.emit(message.response(data={"active_alarms": total}))
 
-    def handle_active_alarm_query(self, _):
+    def handle_active_alarm_query(self, message):
         """Emits an event indicating whether or not there are any active alarms.
 
         In this case, an "active alarm" is defined as any alarms that exist for a time
         in the future.
         """
         event_data = {"active_alarms": bool(self.settings["alarm"])}
-        event = Message("skill.alarm.active-queried", data=event_data)
+        event = message.response(data=event_data)
         self.bus.emit(event)
 
     def set_alarm(self, when, name=None, repeat=None):
