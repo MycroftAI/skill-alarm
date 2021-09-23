@@ -146,8 +146,10 @@ class AlarmSkill(MycroftSkill):
 
         self._schedule()
 
-        # Support query for active alarms from other skills
+        # TODO: remove the "private.mycroftai.has_alarm" event in favor of the
+        #   "skill.alarm.query-active" event.
         self.add_event("private.mycroftai.has_alarm", self.on_has_alarm)
+        self.add_event("skill.alarm.query-active", self.handle_active_alarm_query)
 
         # establish local timezone from config
         self.local_tz = self.location_timezone
@@ -162,23 +164,35 @@ class AlarmSkill(MycroftSkill):
 
         self.skill_control.states = {
                 'inactive':[
-                    'handle_wake_me', 
-                    'handle_set_alarm', 
-                    'handle_status', 
-                    'handle_delete', 
+                    'handle_wake_me',
+                    'handle_set_alarm',
+                    'handle_status',
+                    'handle_delete',
                     'change.alarm.sound.intent'
                     ],
                 'active':['handle_delete', 'snooze'],
-                'wait_reply':[],  
+                'wait_reply':[],
                 'wait_confirm':[]
                 }
         self.skill_control.state = 'inactive'
 
 
+    # TODO: remove the "private.mycroftai.has_alarm" event in favor of the
+    #   "skill.alarm.query-active" event.
     def on_has_alarm(self, message):
         """Reply to requests for alarm on/off status."""
         total = len(self.settings["alarm"])
         self.bus.emit(message.response(data={"active_alarms": total}))
+
+    def handle_active_alarm_query(self, message):
+        """Emits an event indicating whether or not there are any active alarms.
+
+        In this case, an "active alarm" is defined as any alarms that exist for a time
+        in the future.
+        """
+        event_data = {"active_alarms": bool(self.settings["alarm"])}
+        event = message.response(data=event_data)
+        self.bus.emit(event)
 
     def set_alarm(self, when, name=None, repeat=None):
         """Set an alarm at the specified datetime."""
@@ -218,6 +232,9 @@ class AlarmSkill(MycroftSkill):
             self.schedule_event(
                 self._alarm_expired, to_system(alarm_dt), name="NextAlarm"
             )
+        event_data = {"active_alarms": bool(self.settings["alarm"])}
+        event = Message("skill.alarm.scheduled", data=event_data)
+        self.bus.emit(event)
 
     def _get_recurrence(self, utterance: str):
         """Get recurrence pattern from user utterance."""
@@ -660,7 +677,7 @@ class AlarmSkill(MycroftSkill):
             or (when and not time_matches)
         ):
             return (status[2], None)
-        # If number of alarms filtered were the same, 
+        # If number of alarms filtered were the same,
         # assume user asked for ALL alarms
         if (
             len(alarms) == orig_count
@@ -729,10 +746,10 @@ class AlarmSkill(MycroftSkill):
         return int_val
 
     def get_advanced_matches(self, utt, have_time, when, when_utc, user_dow, alarm_list):
-        '''see if we have any of the following 
+        '''see if we have any of the following
            in order of preference
            exact matches
-           date matches 
+           date matches
            time of day matches (tod)
            day of week matches (dow)
            day of month matches (dom)
@@ -748,7 +765,7 @@ class AlarmSkill(MycroftSkill):
         if dom is None:
             dom = extract_number(utt)
 
-        # if the user says a day of the week (mon-sun) we 
+        # if the user says a day of the week (mon-sun) we
         # keep them in a separate list of day of week matches
         dow_matches = []
 
@@ -773,7 +790,7 @@ class AlarmSkill(MycroftSkill):
             dt_obj = dt_obj.astimezone(pytz.utc)
 
             # we also need a local version of our utc time
-            cfg_tz = pytz.timezone(self.local_tz) 
+            cfg_tz = pytz.timezone(self.local_tz)
             dt_local = dt_obj.astimezone(cfg_tz)
 
             if user_dow == dt_local.weekday():
@@ -788,7 +805,7 @@ class AlarmSkill(MycroftSkill):
                     exact_matches.append(alm)
             else:
                 self.log.debug("    Loop: when:%s, dt_obj:%s" % (when_utc, dt_obj))
-                if when_utc is not None and dt_obj is not None:    
+                if when_utc is not None and dt_obj is not None:
                     # do dates match ?
                     if when_utc.strftime("%y-%m-%d") == dt_obj.strftime("%y-%m-%d"):
                         date_matches.append(alm)
@@ -817,7 +834,7 @@ class AlarmSkill(MycroftSkill):
             dt_obj = dt_obj.astimezone(pytz.utc)
 
             # we also need a local version of our utc time
-            cfg_tz = pytz.timezone(self.local_tz) 
+            cfg_tz = pytz.timezone(self.local_tz)
             dt_local = dt_obj.astimezone(cfg_tz)
 
             self.log.debug("Check for TOD matches, dt_local.time()=%s" % (dt_local.time(),))
@@ -835,13 +852,13 @@ class AlarmSkill(MycroftSkill):
         return user_dow
 
     def workaround_lingua_franca(self, utt):
-        # Lingua-franca workaround - day of 
-        # week and date confuses LF terribly. 
-        # if a day of the week (monday, friday, 
+        # Lingua-franca workaround - day of
+        # week and date confuses LF terribly.
+        # if a day of the week (monday, friday,
         # etc) is included with a valid date
-        # like "monday april 5th" LF will 
-        # return bad data so we make sure 
-        # we never include both. "monday 
+        # like "monday april 5th" LF will
+        # return bad data so we make sure
+        # we never include both. "monday
         # april 5th" becomes "april 5th".
 
         for month in self.months:
@@ -996,7 +1013,7 @@ class AlarmSkill(MycroftSkill):
         if has_expired_alarm(self.settings["alarm"]) and utterances:
             self.log.debug("AlarmSkill will consume the utterance")
             if utterances and self.voc_match(utterances[0], "StopBeeping"):
-                self._stop_expired_alarm()  
+                self._stop_expired_alarm()
             elif self.voc_match(utterances[0], "Snooze"):
                 message = Message(
                   "internal.snooze",
