@@ -309,7 +309,6 @@ class AlarmSkill(MycroftSkill):
         when, utt_no_datetime = extract_datetime(utt) or (None, utt)
 
         # Get name from leftover string from extract_datetime
-        self.log.warning("utterance: " + utt_no_datetime)
         name = self._get_alarm_name(utt_no_datetime)
 
         # Will return dt of unmatched string
@@ -1047,7 +1046,6 @@ class AlarmSkill(MycroftSkill):
         else:
             alarm_time = nice_time(alarm_dt, speech=False, use_ampm=True)
             self.gui["alarmTime"], self.gui["alarmAmPm"] = alarm_time.split()
-        self.log.warning("alarm name: " + str(alarm_name))
         self.gui["alarmName"] = alarm_name.title()
         self.gui["alarmExpired"] = alarm_exp
         override_idle = True if alarm_exp else False
