@@ -47,6 +47,8 @@ from .lib.recur import (
     describe_repeat_rule,
 )
 
+MARK_II = "mycroft_mark_2"
+USE_24_HOUR = "full"
 
 # WORKING PHRASES/SEQUENCES:
 # Set an alarm
@@ -417,7 +419,7 @@ class AlarmSkill(MycroftSkill):
                 if res:
                     try:
                         name = res.group("Name").strip()
-                        self.log.debug("Regex name extracted: {}".format(name))
+                        self.log.info("Regex name extracted: {}".format(name))
                         if name and len(name.strip()) > 0 and name not in invalid_names:
                             return name.lower()
                     except IndexError:
@@ -1037,12 +1039,22 @@ class AlarmSkill(MycroftSkill):
             x += w
 
     def _show_alarm_ui(self, alarm_dt, alarm_name, alarm_exp=False):
-        self.gui["alarmTime"] = nice_time(alarm_dt, speech=False,
-                                          use_ampm=True)
+        if self.config_core.get("time_format") == USE_24_HOUR:
+            self.gui["alarmTime"] = nice_time(alarm_dt, speech=False,
+                                              use_ampm=False)
+            self.gui["alarmAmPm"] = ""
+        else:
+            alarm_time = nice_time(alarm_dt, speech=False, use_ampm=True)
+            self.gui["alarmTime"], self.gui["alarmAmPm"] = alarm_time.split()
         self.gui["alarmName"] = alarm_name.title()
         self.gui["alarmExpired"] = alarm_exp
         override_idle = True if alarm_exp else False
-        self.gui.show_page("alarm.qml", override_idle=override_idle)
+        platform = self.config_core['enclosure'].get('platform', 'unknown')
+        if platform == MARK_II:
+            page_name = "alarm_mark_ii.qml"
+        else:
+            page_name = "alarm_scalable.qml"
+        self.gui.show_page(page_name, override_idle=override_idle)
 
     ##########################################################################
     # Public Skill API Methods
