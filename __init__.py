@@ -87,6 +87,7 @@ class AlarmSkill(MycroftSkill):
 
         # initialize alarm settings
         self.init_settings()
+
         try:
             self.mixer = Mixer()
         except Exception:
@@ -96,6 +97,7 @@ class AlarmSkill(MycroftSkill):
             except Exception as err:
                 self.log.warning("Couldn't allocate mixer, {}".format(repr(err)))
                 self.mixer = None
+
         self.saved_volume = None
 
         # Alarm list format [{
@@ -301,6 +303,7 @@ class AlarmSkill(MycroftSkill):
     @intent_handler(
         IntentBuilder("")
         .require("Alarm")
+        .optionally("Set")
         .optionally("Recurring")
         .optionally("Recurrence")
     )
@@ -318,8 +321,8 @@ class AlarmSkill(MycroftSkill):
         # Get the time
         when, utt_no_datetime = extract_datetime(utt) or (None, utt)
 
-        # Get name from leftover string from extract_datetime
-        name = self._get_alarm_name(utt_no_datetime)
+        # Get name from utterance
+        name = self._get_alarm_name(utt)
 
         # Will return dt of unmatched string
         today = extract_datetime("today", lang="en-us")[0]
