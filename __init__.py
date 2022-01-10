@@ -96,7 +96,7 @@ class AlarmSkill(MycroftSkill):
         except Exception:
             # Retry instanciating the mixer
             try:
-                self.mixer = Mixer()
+                self.mixer = Mixer("Playback")  # Mark II
             except Exception as err:
                 self.log.warning("Couldn't allocate mixer, {}".format(repr(err)))
                 self.mixer = None
