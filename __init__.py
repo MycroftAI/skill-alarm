@@ -26,6 +26,7 @@ from mycroft.util import play_mp3
 from mycroft.util.format import nice_date_time, nice_time, nice_date, join_list, date_time_format
 from mycroft.util.parse import extract_datetime, extract_number
 from mycroft.util.time import to_utc, now_local, now_utc
+from mycroft.util.log import LOG
 
 from mycroft.util.time import to_system
 
@@ -325,7 +326,7 @@ class AlarmSkill(MycroftSkill):
         when, utt_no_datetime = extract_datetime(utt) or (None, utt)
 
         # Get name from utterance
-        name = self._get_alarm_name(utt)
+        name = self._get_alarm_name(utt_no_datetime)
 
         # Will return dt of unmatched string
         today = extract_datetime("today", lang="en-us")[0]
@@ -942,6 +943,11 @@ class AlarmSkill(MycroftSkill):
             total = None
 
         if total == 1:
+            # Show UI during confirmation
+            alarm_time = get_alarm_local(alarms[0])
+            name = alarms[0]["name"]
+            self._show_alarm_ui(alarm_time, name)
+
             desc = self._describe(alarms[0])
             recurring = ".recurring" if alarms[0]["repeat_rule"] else ""
 
@@ -952,17 +958,21 @@ class AlarmSkill(MycroftSkill):
                 del self.settings["alarm"][self.settings["alarm"].index(alarms[0])]
                 self._schedule()
                 self.speak_dialog(
-                    "alarm.cancelled.desc" + recurring, data={"desc": desc}
+                    "alarm.cancelled.desc" + recurring, data={"desc": desc},
+                    wait=True
                 )
                 self.change_state('inactive')
-                self.gui.release()
-                return
             else:
                 self.speak_dialog("alarm.delete.cancelled")
                 # As the user did not confirm to delete
                 # return True to skip all the remaining conditions
                 self.change_state('inactive')
-                return
+
+            if self.gui.connected:
+                # Clear UI
+                self.gui.clear()
+
+            return
         elif status in ["Next", "All", "Matched"]:
             if (
                 self.ask_yesno("ask.cancel.alarm.plural", data={"count": total})
