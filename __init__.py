@@ -397,10 +397,13 @@ class AlarmSkill(MycroftSkill):
             self.change_state('inactive')
             return
 
+        # Show UI before speaking
+        self._show_alarm_ui(alarm_time, name)
+
         # Don't want to hide the animation
         self.enclosure.deactivate_mouth_events()
         if confirmed_time:
-            self.speak_dialog("alarm.scheduled")
+            self.speak_dialog("alarm.scheduled", wait=True)
         else:
             alarm_nice_time = self._describe(alarm)
             reltime = nice_relative_time(get_alarm_local(alarm))
@@ -408,17 +411,22 @@ class AlarmSkill(MycroftSkill):
                 self.speak_dialog(
                     "recurring.alarm.scheduled.for.time",
                     data={"time": alarm_nice_time, "rel": reltime},
+                    wait=True,
                 )
             else:
                 self.speak_dialog(
                     "alarm.scheduled.for.time",
                     data={"time": alarm_nice_time, "rel": reltime},
+                    wait=True,
                 )
 
-        self._show_alarm_ui(alarm_time, name)
         self._show_alarm_anim(alarm_time)
         self.enclosure.activate_mouth_events()
         self.change_state('inactive')
+
+        if self.gui.connected:
+            # Clear UI
+            self.gui.clear()
 
     def _get_alarm_name(self, utt):
         """Get the alarm name using regex on an utterance."""
@@ -525,22 +533,38 @@ class AlarmSkill(MycroftSkill):
         elif status == "User Cancelled":
             return
         elif status == "Next":
-            reltime = nice_relative_time(get_alarm_local(alarms[0]))
+            alarm_time = get_alarm_local(alarms[0])
+            reltime = nice_relative_time(alarm_time)
+            name = alarms[0]["name"]
+            self._show_alarm_ui(alarm_time, name)
 
             self.speak_dialog(
                 "next.alarm",
                 data={"when": self._describe(alarms[0]), "duration": reltime},
+                wait=True,
             )
         else:
             if total == 1:
+                alarm_time = get_alarm_local(alarms[0])
+                reltime = nice_relative_time(alarm_time)
+                name = alarms[0]["name"]
+                self._show_alarm_ui(alarm_time, name)
+
                 reltime = nice_relative_time(get_alarm_local(alarms[0]))
                 self.speak_dialog(
-                    "alarms.list.single", data={"item": desc[0], "duration": reltime}
+                    "alarms.list.single", data={"item": desc[0], "duration": reltime},
+                    wait=True,
                 )
             else:
+                # TODO: Add multi-alarm UI
                 self.speak_dialog(
-                    "alarms.list.multi", data={"count": total, "items": items_string}
+                    "alarms.list.multi", data={"count": total, "items": items_string},
+                    wait=True,
                 )
+
+        if self.gui.connected:
+            # Clear UI
+            self.gui.clear()
 
     def _get_alarm_matches(
         self,
