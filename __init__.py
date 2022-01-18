@@ -220,7 +220,7 @@ class AlarmSkill(MycroftSkill):
 
         for existing in self.settings["alarm"]:
             if alarm == existing:
-                self.speak_dialog("alarm.already.exists")
+                self.speak_dialog("alarm.already.exists", wait=True)
                 return None
         self.settings["alarm"].append(alarm)
         self._schedule()
@@ -254,7 +254,7 @@ class AlarmSkill(MycroftSkill):
         # TODO: remove days following an "except" in the utt
         if self.voc_match(utterance, "Except"):
             # TODO: Support exceptions
-            self.speak_dialog("no.exceptions.yet")
+            self.speak_dialog("no.exceptions.yet", wait=True)
             return
 
         return recur
@@ -302,7 +302,8 @@ class AlarmSkill(MycroftSkill):
     )
     def handle_wake_me(self, message):
         """Handler for "wake me at..."""
-        self.handle_set_alarm(message)
+        with self.activity():
+            self.handle_set_alarm(message)
 
     @intent_handler(
         IntentBuilder("")
@@ -313,121 +314,122 @@ class AlarmSkill(MycroftSkill):
     )
     def handle_set_alarm(self, message):
         """Handler for "set an alarm for..."""
-        self.change_state('active')
-        utt = message.data.get("utterance").lower()
-        recur = None
+        with self.activity():
+            self.change_state('active')
+            utt = message.data.get("utterance").lower()
+            recur = None
 
-        if message.data.get("Recurring"):
-            # Just ignoring the 'Recurrence' now, we support more complex stuff
-            # recurrence = message.data.get('Recurrence')
-            recur = self._get_recurrence(utt)
+            if message.data.get("Recurring"):
+                # Just ignoring the 'Recurrence' now, we support more complex stuff
+                # recurrence = message.data.get('Recurrence')
+                recur = self._get_recurrence(utt)
 
-        # Get the time
-        when, utt_no_datetime = extract_datetime(utt) or (None, utt)
+            # Get the time
+            when, utt_no_datetime = extract_datetime(utt) or (None, utt)
 
-        # Get name from utterance
-        name = self._get_alarm_name(utt_no_datetime)
+            # Get name from utterance
+            name = self._get_alarm_name(utt_no_datetime)
 
-        # Will return dt of unmatched string
-        today = extract_datetime("today", lang="en-us")[0]
+            # Will return dt of unmatched string
+            today = extract_datetime("today", lang="en-us")[0]
 
-        # Check the time if it's midnight. This is to check if the user
-        # said a recurring alarm with only the Day or if the user did
-        # specify to set an alarm on midnight. If it's confirmed that
-        # it's for a day only, then get another response from the user
-        # to clarify what time on that day the recurring alarm is.
-        is_midnight = utterance_has_midnight(
-            utt, when, self.THRESHOLD, self.translate_list("midnight")
-        )
+            # Check the time if it's midnight. This is to check if the user
+            # said a recurring alarm with only the Day or if the user did
+            # specify to set an alarm on midnight. If it's confirmed that
+            # it's for a day only, then get another response from the user
+            # to clarify what time on that day the recurring alarm is.
+            is_midnight = utterance_has_midnight(
+                utt, when, self.THRESHOLD, self.translate_list("midnight")
+            )
 
-        if (when is None or when.time() == today.time()) and not is_midnight:
-            response = self.get_response("query.for.when", validator=extract_datetime)
-            if not response:
-                self.speak_dialog("alarm.schedule.cancelled")
-                self.change_state('inactive')
-                return
-            when_temp = extract_datetime(response)
-            if when_temp is not None:
-                when_temp = when_temp[0]
-                # TODO add check for midnight
-                # is_midnight = utterance_has_midnight(response, when_temp, self.THRESHOLD,
-                #                                      self.translate_list("midnight"))
-                when = (
-                    when_temp
-                    if when is None
-                    else datetime(
-                        tzinfo=when.tzinfo,
-                        year=when.year,
-                        month=when.month,
-                        day=when.day,
-                        hour=when_temp.hour,
-                        minute=when_temp.minute,
-                    )
-                )
-            else:
-                when = None
-
-        verified_alarm = self._verify_alarm_time(when, today, recur)
-        if verified_alarm is None:
-            self.change_state('inactive')
-            return
-        alarm_time, confirmed_time = verified_alarm
-
-        alarm = {}
-        if not recur:
-            alarm_time_ts = to_utc(alarm_time).timestamp()
-            now_ts = now_utc().timestamp()
-            if alarm_time_ts > now_ts:
-                alarm = self.set_alarm(alarm_time, name)
-            else:
-                if self.translate("today") in utt or self.translate("tonight") in utt:
-                    self.speak_dialog("alarm.past")
+            if (when is None or when.time() == today.time()) and not is_midnight:
+                response = self.get_response("query.for.when", validator=extract_datetime)
+                if not response:
+                    self.speak_dialog("alarm.schedule.cancelled", wait=True)
                     self.change_state('inactive')
                     return
+                when_temp = extract_datetime(response)
+                if when_temp is not None:
+                    when_temp = when_temp[0]
+                    # TODO add check for midnight
+                    # is_midnight = utterance_has_midnight(response, when_temp, self.THRESHOLD,
+                    #                                      self.translate_list("midnight"))
+                    when = (
+                        when_temp
+                        if when is None
+                        else datetime(
+                            tzinfo=when.tzinfo,
+                            year=when.year,
+                            month=when.month,
+                            day=when.day,
+                            hour=when_temp.hour,
+                            minute=when_temp.minute,
+                        )
+                    )
                 else:
-                    # Set the alarm to find the next 24 hour time slot
-                    while alarm_time_ts < now_ts:
-                        alarm_time_ts += 86400.0
-                    alarm_time = datetime.utcfromtimestamp(alarm_time_ts)
+                    when = None
+
+            verified_alarm = self._verify_alarm_time(when, today, recur)
+            if verified_alarm is None:
+                self.change_state('inactive')
+                return
+            alarm_time, confirmed_time = verified_alarm
+
+            alarm = {}
+            if not recur:
+                alarm_time_ts = to_utc(alarm_time).timestamp()
+                now_ts = now_utc().timestamp()
+                if alarm_time_ts > now_ts:
                     alarm = self.set_alarm(alarm_time, name)
-        else:
-            alarm = self.set_alarm(alarm_time, name, repeat=recur)
-
-        if not alarm:
-            # none set, it was a duplicate
-            self.change_state('inactive')
-            return
-
-        # Show UI before speaking
-        self._show_alarm_ui(alarm_time, name)
-
-        # Don't want to hide the animation
-        self.enclosure.deactivate_mouth_events()
-        if confirmed_time:
-            self.speak_dialog("alarm.scheduled", wait=True)
-        else:
-            alarm_nice_time = self._describe(alarm)
-            reltime = nice_relative_time(get_alarm_local(alarm))
-            if recur:
-                self.speak_dialog(
-                    "recurring.alarm.scheduled.for.time",
-                    data={"time": alarm_nice_time, "rel": reltime},
-                    wait=True,
-                )
+                else:
+                    if self.translate("today") in utt or self.translate("tonight") in utt:
+                        self.speak_dialog("alarm.past", wait=True)
+                        self.change_state('inactive')
+                        return
+                    else:
+                        # Set the alarm to find the next 24 hour time slot
+                        while alarm_time_ts < now_ts:
+                            alarm_time_ts += 86400.0
+                        alarm_time = datetime.utcfromtimestamp(alarm_time_ts)
+                        alarm = self.set_alarm(alarm_time, name)
             else:
-                self.speak_dialog(
-                    "alarm.scheduled.for.time",
-                    data={"time": alarm_nice_time, "rel": reltime},
-                    wait=True,
-                )
+                alarm = self.set_alarm(alarm_time, name, repeat=recur)
 
-        self._show_alarm_anim(alarm_time)
-        self.enclosure.activate_mouth_events()
-        self.change_state('inactive')
+            if not alarm:
+                # none set, it was a duplicate
+                self.change_state('inactive')
+                return
 
-        if self.gui.connected:
-            # Clear UI
-            self.gui.clear()
+            # Show UI before speaking
+            self._show_alarm_ui(alarm_time, name)
+
+            # Don't want to hide the animation
+            self.enclosure.deactivate_mouth_events()
+            if confirmed_time:
+                self.speak_dialog("alarm.scheduled", wait=True)
+            else:
+                alarm_nice_time = self._describe(alarm)
+                reltime = nice_relative_time(get_alarm_local(alarm))
+                if recur:
+                    self.speak_dialog(
+                        "recurring.alarm.scheduled.for.time",
+                        data={"time": alarm_nice_time, "rel": reltime},
+                        wait=True,
+                    )
+                else:
+                    self.speak_dialog(
+                        "alarm.scheduled.for.time",
+                        data={"time": alarm_nice_time, "rel": reltime},
+                        wait=True,
+                    )
+
+            self._show_alarm_anim(alarm_time)
+            self.enclosure.activate_mouth_events()
+            self.change_state('inactive')
+
+            if self.gui.connected:
+                # Clear UI
+                self.gui.clear()
 
     def _get_alarm_name(self, utt):
         """Get the alarm name using regex on an utterance."""
@@ -505,67 +507,68 @@ class AlarmSkill(MycroftSkill):
     def handle_status(self, message):
         """Respond to request for alarm status."""
 
-        utt = message.data.get("utterance")
+        with self.activity():
+            utt = message.data.get("utterance")
 
-        if len(self.settings["alarm"]) == 0:
-            self.speak_dialog("alarms.list.empty")
-            return
+            if len(self.settings["alarm"]) == 0:
+                self.speak_dialog("alarms.list.empty", wait=True)
+                return
 
-        status, alarms = self._get_alarm_matches(
-            utt,
-            alarm=self.settings["alarm"],
-            max_results=3,
-            dialog="ask.which.alarm",
-            is_response=False,
-        )
-        total = None
-        desc = []
-        if alarms:
-            total = len(alarms)
-            for alarm in alarms:
-                desc.append(self._describe(alarm))
-
-        items_string = ""
-        if desc:
-            items_string = join_list(desc, self.translate("and"))
-
-        if status == "No Match Found":
-            self.speak_dialog("alarm.not.found")
-        elif status == "User Cancelled":
-            return
-        elif status == "Next":
-            alarm_time = get_alarm_local(alarms[0])
-            reltime = nice_relative_time(alarm_time)
-            name = alarms[0]["name"]
-            self._show_alarm_ui(alarm_time, name)
-
-            self.speak_dialog(
-                "next.alarm",
-                data={"when": self._describe(alarms[0]), "duration": reltime},
-                wait=True,
+            status, alarms = self._get_alarm_matches(
+                utt,
+                alarm=self.settings["alarm"],
+                max_results=3,
+                dialog="ask.which.alarm",
+                is_response=False,
             )
-        else:
-            if total == 1:
+            total = None
+            desc = []
+            if alarms:
+                total = len(alarms)
+                for alarm in alarms:
+                    desc.append(self._describe(alarm))
+
+            items_string = ""
+            if desc:
+                items_string = join_list(desc, self.translate("and"))
+
+            if status == "No Match Found":
+                self.speak_dialog("alarm.not.found", wait=True)
+            elif status == "User Cancelled":
+                return
+            elif status == "Next":
                 alarm_time = get_alarm_local(alarms[0])
                 reltime = nice_relative_time(alarm_time)
                 name = alarms[0]["name"]
                 self._show_alarm_ui(alarm_time, name)
 
-                reltime = nice_relative_time(get_alarm_local(alarms[0]))
                 self.speak_dialog(
-                    "alarms.list.single", data={"item": desc[0], "duration": reltime},
+                    "next.alarm",
+                    data={"when": self._describe(alarms[0]), "duration": reltime},
                     wait=True,
                 )
             else:
-                # TODO: Add multi-alarm UI
-                self.speak_dialog(
-                    "alarms.list.multi", data={"count": total, "items": items_string},
-                    wait=True,
-                )
+                if total == 1:
+                    alarm_time = get_alarm_local(alarms[0])
+                    reltime = nice_relative_time(alarm_time)
+                    name = alarms[0]["name"]
+                    self._show_alarm_ui(alarm_time, name)
 
-        if self.gui.connected:
-            # Clear UI
-            self.gui.clear()
+                    reltime = nice_relative_time(get_alarm_local(alarms[0]))
+                    self.speak_dialog(
+                        "alarms.list.single", data={"item": desc[0], "duration": reltime},
+                        wait=True,
+                    )
+                else:
+                    # TODO: Add multi-alarm UI
+                    self.speak_dialog(
+                        "alarms.list.multi", data={"count": total, "items": items_string},
+                        wait=True,
+                    )
+
+            if self.gui.connected:
+                # Clear UI
+                self.gui.clear()
 
     def _get_alarm_matches(
         self,
@@ -910,88 +913,89 @@ class AlarmSkill(MycroftSkill):
     )
     def handle_delete(self, message):
         """Respond to request to remove a scheduled alarm."""
-        self.change_state('active')
-        if has_expired_alarm(self.settings["alarm"]):
-            self._stop_expired_alarm()
-            return
+        with self.activity():
+            self.change_state('active')
+            if has_expired_alarm(self.settings["alarm"]):
+                self._stop_expired_alarm()
+                return
 
-        total = len(self.settings["alarm"])
-        if not total:
-            self.speak_dialog("alarms.list.empty")
-            self.change_state('inactive')
-            return
-
-        utt = message.data.get("utterance") or ""
-
-        status, alarms = self._get_alarm_matches(
-            utt,
-            alarm=self.settings["alarm"],
-            max_results=1,
-            dialog="ask.which.alarm.delete",
-            is_response=False,
-        )
-
-
-        if status == "User Cancelled":
-            self.speak_dialog("alarm.delete.cancelled")
-            self.change_state('inactive')
-            return
-
-        if alarms:
-            total = len(alarms)
-        else:
-            total = None
-
-        if total == 1:
-            # Show UI during confirmation
-            alarm_time = get_alarm_local(alarms[0])
-            name = alarms[0]["name"]
-            self._show_alarm_ui(alarm_time, name)
-
-            desc = self._describe(alarms[0])
-            recurring = ".recurring" if alarms[0]["repeat_rule"] else ""
-
-            if (
-                self.ask_yesno("ask.cancel.desc.alarm" + recurring, data={"desc": desc})
-                == "yes"
-            ):
-                del self.settings["alarm"][self.settings["alarm"].index(alarms[0])]
-                self._schedule()
-                self.speak_dialog(
-                    "alarm.cancelled.desc" + recurring, data={"desc": desc},
-                    wait=True
-                )
+            total = len(self.settings["alarm"])
+            if not total:
+                self.speak_dialog("alarms.list.empty", wait=True)
                 self.change_state('inactive')
+                return
+
+            utt = message.data.get("utterance") or ""
+
+            status, alarms = self._get_alarm_matches(
+                utt,
+                alarm=self.settings["alarm"],
+                max_results=1,
+                dialog="ask.which.alarm.delete",
+                is_response=False,
+            )
+
+
+            if status == "User Cancelled":
+                self.speak_dialog("alarm.delete.cancelled", wait=True)
+                self.change_state('inactive')
+                return
+
+            if alarms:
+                total = len(alarms)
             else:
-                self.speak_dialog("alarm.delete.cancelled")
-                # As the user did not confirm to delete
-                # return True to skip all the remaining conditions
-                self.change_state('inactive')
+                total = None
 
-            if self.gui.connected:
-                # Clear UI
-                self.gui.clear()
+            if total == 1:
+                # Show UI during confirmation
+                alarm_time = get_alarm_local(alarms[0])
+                name = alarms[0]["name"]
+                self._show_alarm_ui(alarm_time, name)
+
+                desc = self._describe(alarms[0])
+                recurring = ".recurring" if alarms[0]["repeat_rule"] else ""
+
+                if (
+                    self.ask_yesno("ask.cancel.desc.alarm" + recurring, data={"desc": desc})
+                    == "yes"
+                ):
+                    del self.settings["alarm"][self.settings["alarm"].index(alarms[0])]
+                    self._schedule()
+                    self.speak_dialog(
+                        "alarm.cancelled.desc" + recurring, data={"desc": desc},
+                        wait=True
+                    )
+                    self.change_state('inactive')
+                else:
+                    self.speak_dialog("alarm.delete.cancelled", wait=True)
+                    # As the user did not confirm to delete
+                    # return True to skip all the remaining conditions
+                    self.change_state('inactive')
+
+                if self.gui.connected:
+                    # Clear UI
+                    self.gui.clear()
+
+                return
+            elif status in ["Next", "All", "Matched"]:
+                if (
+                    self.ask_yesno("ask.cancel.alarm.plural", data={"count": total})
+                    == "yes"
+                ):
+                    self.settings["alarm"] = [
+                        a for a in self.settings["alarm"] if a not in alarms
+                    ]
+                    self._schedule()
+                    self.change_state('inactive')
+                    self.speak_dialog("alarm.cancelled.multi", data={"count": total}, wait=True)
+                    self.gui.release()
+                return
+            elif not total:
+                # Failed to delete
+                self.change_state('inactive')
+                self.speak_dialog("alarm.not.found", wait=True)
 
             return
-        elif status in ["Next", "All", "Matched"]:
-            if (
-                self.ask_yesno("ask.cancel.alarm.plural", data={"count": total})
-                == "yes"
-            ):
-                self.settings["alarm"] = [
-                    a for a in self.settings["alarm"] if a not in alarms
-                ]
-                self._schedule()
-                self.change_state('inactive')
-                self.speak_dialog("alarm.cancelled.multi", data={"count": total})
-                self.gui.release()
-            return
-        elif not total:
-            # Failed to delete
-            self.change_state('inactive')
-            self.speak_dialog("alarm.not.found")
-
-        return
 
     #@intent_handler("snooze.intent")
     @intent_handler(IntentBuilder("snooze").optionally("Snooze"))
@@ -1000,40 +1004,41 @@ class AlarmSkill(MycroftSkill):
 
         If no time provided by user, defaults to 9 mins.
         """
-        if not has_expired_alarm(self.settings["alarm"]):
-            return
+        with self.activity():
+            if not has_expired_alarm(self.settings["alarm"]):
+                return
 
-        self.cancel_scheduled_event("Beep")
-        self.cancel_scheduled_event("NextAlarm")
+            self.cancel_scheduled_event("Beep")
+            self.cancel_scheduled_event("NextAlarm")
 
-        self.__end_beep()
-        self.__end_flash()
+            self.__end_beep()
+            self.__end_flash()
 
-        utt = message.data.get("utterance") or ""
-        snooze_for = extract_number(utt[0])
-        if not snooze_for or snooze_for < 1:
-            snooze_for = 9  # default to 9 minutes
+            utt = message.data.get("utterance") or ""
+            snooze_for = extract_number(utt[0])
+            if not snooze_for or snooze_for < 1:
+                snooze_for = 9  # default to 9 minutes
 
-        # Snooze always applies the the first alarm in the sorted array
-        alarm = self.settings["alarm"][0]
-        alarm_dt = get_alarm_local(alarm)
-        snooze = to_utc(alarm_dt) + timedelta(minutes=snooze_for)
+            # Snooze always applies the the first alarm in the sorted array
+            alarm = self.settings["alarm"][0]
+            alarm_dt = get_alarm_local(alarm)
+            snooze = to_utc(alarm_dt) + timedelta(minutes=snooze_for)
 
-        if "snooze" in alarm:
-            # already snoozed
-            original_time = alarm["snooze"]
-        else:
-            original_time = alarm["timestamp"]
+            if "snooze" in alarm:
+                # already snoozed
+                original_time = alarm["snooze"]
+            else:
+                original_time = alarm["timestamp"]
 
-        # Fill schedule with a snoozed entry -- 3 items:
-        #    snooze_expire_timestamp, repeat_rule, original_timestamp
-        self.settings["alarm"][0] = {
-            "timestamp": snooze.timestamp(),
-            "repeat_rule": alarm["repeat_rule"],
-            "name": alarm["name"],
-            "snooze": original_time,
-        }
-        self._schedule()
+            # Fill schedule with a snoozed entry -- 3 items:
+            #    snooze_expire_timestamp, repeat_rule, original_timestamp
+            self.settings["alarm"][0] = {
+                "timestamp": snooze.timestamp(),
+                "repeat_rule": alarm["repeat_rule"],
+                "name": alarm["name"],
+                "snooze": original_time,
+            }
+            self._schedule()
 
     @intent_handler("change.alarm.sound.intent")
     def handle_change_alarm(self, _):
@@ -1042,7 +1047,8 @@ class AlarmSkill(MycroftSkill):
         Note: This functionality is not yet supported. Directs users to Skill
         settings on home.mycroft.ai.
         """
-        self.speak_dialog("alarm.change.sound")
+        with self.activity():
+            self.speak_dialog("alarm.change.sound", wait=True)
 
     ##########################################################################
     # Audio and Device Feedback
