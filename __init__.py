@@ -22,7 +22,6 @@ from adapt.intent import IntentBuilder
 from mycroft import MycroftSkill, intent_handler
 from mycroft.messagebus.message import Message
 from mycroft.skills import skill_api_method
-from mycroft.util import play_mp3
 from mycroft.util.format import nice_date_time, nice_time, nice_date, join_list, date_time_format
 from mycroft.util.parse import extract_datetime, extract_number
 from mycroft.util.time import to_utc, now_local, now_utc
@@ -67,7 +66,6 @@ class AlarmSkill(MycroftSkill):
 
     def __init__(self):
         super(AlarmSkill, self).__init__()
-        self.beep_process = None
         self.beep_start_time = None
         self.flash_state = 0
         self.recurrence_dict = None
@@ -91,18 +89,6 @@ class AlarmSkill(MycroftSkill):
 
         # initialize alarm settings
         self.init_settings()
-
-        try:
-            self.mixer = Mixer()
-        except Exception:
-            # Retry instanciating the mixer
-            try:
-                self.mixer = Mixer("Playback")  # Mark II
-            except Exception as err:
-                self.log.warning("Couldn't allocate mixer, {}".format(repr(err)))
-                self.mixer = None
-
-        self.saved_volume = None
 
         # Alarm list format [{
         #                      "timestamp": float,
@@ -998,7 +984,7 @@ class AlarmSkill(MycroftSkill):
             return
 
     #@intent_handler("snooze.intent")
-    @intent_handler(IntentBuilder("snooze").optionally("Snooze"))
+    @intent_handler(IntentBuilder("snooze"))
     def snooze_alarm(self, message):
         """Snooze an expired alarm for the requested time.
 
@@ -1118,16 +1104,8 @@ class AlarmSkill(MycroftSkill):
         self.cancel_scheduled_event("Beep")
         self.schedule_event(self._play_beep, to_system(next_beep), name="Beep")
 
-        # Increase volume each pass until fully on
-        if self.saved_volume:
-            if self.volume < 90:
-                self.volume += 10
-            self.mixer.setvolume(self.volume)
-
-        try:
-            self.beep_process = play_mp3(alarm_file)
-        except Exception:
-            self.beep_process = None
+        alarm_uri = f"file://{alarm_file}"
+        self.play_sound_uri(alarm_uri)
 
     def _while_beeping(self, message):
         if self.flash_state < 3:
@@ -1140,24 +1118,9 @@ class AlarmSkill(MycroftSkill):
             self.enclosure.mouth_reset()
             self.flash_state = 0
 
-        # Check if the WAV is still playing
-        if self.beep_process:
-            self.beep_process.poll()
-            if self.beep_process.returncode:
-                # The playback has ended
-                self.beep_process = None
-
     def __end_beep(self):
         self.cancel_scheduled_event("Beep")
         self.beep_start_time = None
-        if self.beep_process:
-            try:
-                if self.beep_process.poll() is None:  # still running
-                    self.beep_process.kill()
-            except Exception:
-                pass
-            self.beep_process = None
-        self._restore_volume()
 
     def _stop_expired_alarm(self):
         if has_expired_alarm(self.settings["alarm"]):
@@ -1175,25 +1138,12 @@ class AlarmSkill(MycroftSkill):
         else:
             return False
 
-    def _restore_volume(self):
-        """Return global volume to the appropriate level if we've messed with it."""
-        if self.saved_volume:
-            self.mixer.setvolume(self.saved_volume[0])
-            self.saved_volume = None
-
     def _alarm_expired(self):
         self.change_state('active')
         self.sound_name = self.settings["sound"]  # user-selected alarm sound
         if not self.sound_name or self.sound_name not in self.sounds:
             # invalid sound name, use the default
             self.sound_name = self.DEFAULT_SOUND
-
-        if self.settings["start_quiet"] and self.mixer:
-            if not self.saved_volume:  # don't overwrite if already saved!
-                self.saved_volume = self.mixer.getvolume()
-                self.volume = 0  # increase by 10% each pass
-        else:
-            self.saved_volume = None
 
         self._play_beep()
 
