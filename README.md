@@ -1,6 +1,8 @@
 # <img src='https://raw.githack.com/FortAwesome/Font-Awesome/master/svgs/solid/clock.svg' card_color='#5B6984' width='50' height='50' style='vertical-align:bottom'/> Set alarms
 Set alarms with Mycroft
 
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 ## About
 Set a single use alarm, daily alarms, or weekly recurring alarms.
 

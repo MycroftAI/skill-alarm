@@ -15,7 +15,7 @@
 import unittest
 from datetime import datetime
 
-from lib.parse import fuzzy_match, utterance_has_midnight
+from skill.parse import fuzzy_match, utterance_has_midnight
 
 THRESHOLD = 0.7
 

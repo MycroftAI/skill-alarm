@@ -17,7 +17,7 @@ from datetime import timedelta
 
 from mycroft.util.time import now_local
 
-from lib.format import nice_relative_time
+from skill.format import nice_relative_time
 
 
 class TestNiceRelativeTime(unittest.TestCase):

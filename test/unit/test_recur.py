@@ -17,11 +17,11 @@ import unittest
 from lingua_franca import set_default_lang
 from mycroft.util.parse import extract_datetime
 
-from lib.recur import (
-    create_day_set,
-    create_recurring_rule,
+from skill.repeat import (
+    determine_repeat_days,
+    create_recurrence_rule,
     describe_recurrence,
-    describe_repeat_rule,
+    build_repeat_rule_description,
 )
 
 set_default_lang("en-us")
@@ -44,17 +44,17 @@ RRULE_WEEKDAYS = "FREQ=WEEKLY;INTERVAL=1;BYDAY=WE,MO,FR,TH,TU"
 
 class TestCreateDaySet(unittest.TestCase):
     def test_create_day_set(self):
-        single_day_set = create_day_set("7pm on mondays", RECURRENCE_DICT)
+        single_day_set = determine_repeat_days("7pm on mondays", RECURRENCE_DICT)
         self.assertEqual(single_day_set, set("1"))
-        week_day_set = create_day_set("4am on weekdays", RECURRENCE_DICT)
+        week_day_set = determine_repeat_days("4am on weekdays", RECURRENCE_DICT)
         self.assertEqual(week_day_set, set(["1", "2", "3", "4", "5"]))
-        split_day_set = create_day_set("tuesdays and thursdays", RECURRENCE_DICT)
+        split_day_set = determine_repeat_days("tuesdays and thursdays", RECURRENCE_DICT)
         self.assertEqual(split_day_set, set(["2", "4"]))
 
 
 class TestCreateRecurringRule(unittest.TestCase):
     def test_create_recurring_rule(self):
-        rrule = create_recurring_rule(extract_datetime("last monday")[0], set("1"))
+        rrule = create_recurrence_rule(extract_datetime("last monday")[0], set("1"))
         self.assertEqual(
             rrule,
             {
@@ -73,10 +73,10 @@ class TestDescribeRecurrence(unittest.TestCase):
 
 class TestDescribeRepeatRule(unittest.TestCase):
     def test_describe_repeat_rule(self):
-        daily_description = describe_repeat_rule(RRULE_DAILY, RECURRENCE_DICT)
+        daily_description = build_repeat_rule_description(RRULE_DAILY, RECURRENCE_DICT)
         self.assertEqual(
             daily_description,
             "sundays, mondays, tuesdays, wednesdays, thursdays, fridays and saturdays",
         )
-        weekday_description = describe_repeat_rule(RRULE_WEEKDAYS, RECURRENCE_DICT)
+        weekday_description = build_repeat_rule_description(RRULE_WEEKDAYS, RECURRENCE_DICT)
         self.assertEqual(weekday_description, "weekdays")
