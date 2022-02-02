@@ -461,7 +461,9 @@ class AlarmSkill(MycroftSkill):
                 alarm_datetime = None
             else:
                 alarm_datetime = extract[0]
-            dismiss = self.translations.dismiss_words in response.replace(" ", "")
+            dismiss = any(
+                [word in response for word in self.translations.dismiss_words]
+            )
             if alarm_datetime is None and not dismiss:
                 raise AlarmValidationException("No duration specified")
 
