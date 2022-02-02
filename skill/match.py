@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Logic to match one or more alarms to a user's request."""
+from copy import copy
 from typing import List, Optional
 
 from mycroft.skills.skill_data import RegexExtractor
@@ -105,7 +106,9 @@ class AlarmMatcher:
     def match(self):
         """Main method to perform the matching."""
         if self.requested_all:
-            self.matches = self.alarms
+            # uses a copy of the passed alarms to avoid issues in the skill with
+            # alarms iterating over themselves
+            self.matches = copy(self.alarms)
         elif self.requested_next:
             self.matches = [self.alarms[0]]
         if self.requested_name is not None:

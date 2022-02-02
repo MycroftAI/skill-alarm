@@ -735,10 +735,7 @@ class AlarmSkill(MycroftSkill):
         if not matches:
             self.speak_dialog("alarms.not.found")
         elif len(matches) == 1:
-            if matches[0] == self.active_alarms[0]:
-                dialog_name = "next.alarm"
-            else:
-                dialog_name = "alarms.list.single"
+            dialog_name = "alarms.list.single"
             alarm = matches[0]
             relative_time = nice_relative_time(alarm.date_time)
             dialog_data = dict(item=alarm.description, duration=relative_time)
