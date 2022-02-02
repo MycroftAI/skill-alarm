@@ -634,15 +634,15 @@ class AlarmSkill(MycroftSkill):
         Returns:
             All alarms that match the criteria specified by the user.
         """
-        matches = None
         matcher = AlarmMatcher(
             utterance, self.active_alarms, self.resource_file_locator, self.translations
         )
         if matcher.no_match_criteria:
             if self.expired_alarms:
                 self._stop_expired_alarms()
+                matches = []
             elif len(self.active_alarms) == 1:
-                self._cancel_one(self.active_alarms[0])
+                matches = [self.active_alarms[0]]
             else:
                 matches = self._disambiguate_request(question="ask.which.alarm.delete")
         else:
@@ -1000,7 +1000,7 @@ class AlarmSkill(MycroftSkill):
         self.change_state("inactive")
 
     def _schedule_faceplate_flashing(self):
-        """Schedules am event to flash the alarm on the faceplate once a second."""
+        """Schedules an event to flash the alarm on the faceplate once a second."""
         self.flash_state = 0
         self.schedule_repeating_event(
             self._flash_faceplate, when=None, frequency=1, name="Flash"
