@@ -77,7 +77,6 @@ class AlarmSkill(MycroftSkill):
     Attributes:
         active_alarms: all alarms that have not expired or have expired and not cleared
         beep_start_time: date and time that the alarm sound began to play
-        file_finder: used to locate resource files, such as dialog and vocabulary files
         flash_state: controls the flashing of the alarm time on a Mark I
         save_path: fully qualified path of the file containing saved alarms
         sound_duration: amount of time it takes to play each sound
@@ -244,10 +243,10 @@ class AlarmSkill(MycroftSkill):
 
     @intent_handler(
         AdaptIntent("")
-        .require("Alarm")
-        .optionally("Set")
-        .optionally("Recurring")
-        .optionally("Recurrence")
+        .require("alarm")
+        .optionally("set")
+        .optionally("recurring")
+        .optionally("recurrence")
     )
     def handle_set_alarm(self, message: Message):
         """Handles request to set alarm from utterance like "set an alarm for...".
@@ -261,9 +260,9 @@ class AlarmSkill(MycroftSkill):
 
     @intent_handler(
         AdaptIntent("")
-        .require("WakeMe")
-        .optionally("Recurring")
-        .optionally("Recurrence")
+        .require("wake-me")
+        .optionally("recurring")
+        .optionally("recurrence")
     )
     def handle_wake_me(self, message: Message):
         """Handles request to set an alarm from utterance like "wake me at...".
@@ -277,10 +276,10 @@ class AlarmSkill(MycroftSkill):
 
     @intent_handler(
         AdaptIntent("")
-        .require("Delete")
-        .require("Alarm")
-        .optionally("Recurring")
-        .optionally("Recurrence")
+        .require("delete")
+        .require("alarm")
+        .optionally("recurring")
+        .optionally("recurrence")
     )
     def handle_cancel_alarm(self, message: Message):
         """Handles request to cancel one or more alarms.
@@ -295,10 +294,10 @@ class AlarmSkill(MycroftSkill):
 
     @intent_handler(
         AdaptIntent("")
-        .require("Query")
-        .optionally("Next")
-        .require("Alarm")
-        .optionally("Recurring")
+        .require("query")
+        .optionally("next")
+        .require("alarm")
+        .optionally("recurring")
     )
     def handle_status(self, message):
         """Report the alarms meeting the requested criteria in the utterance.
@@ -331,7 +330,7 @@ class AlarmSkill(MycroftSkill):
         settings on home.mycroft.ai.
         """
         with self.activity():
-            self.speak_dialog("alarm.change.sound", wait=True)
+            self.speak_dialog("change-sound", wait=True)
 
     def _set_new_alarm(self, utterance):
         """Start a new alarm as requested by the user.
@@ -344,7 +343,7 @@ class AlarmSkill(MycroftSkill):
             alarm = self._build_alarm(utterance)
         except AlarmValidationException as exc:
             self.log.info(str(exc))
-            self.speak_dialog("alarm.schedule.cancelled", wait=True)
+            self.speak_dialog("alarm-not-scheduled", wait=True)
         else:
             # alarm datetime should only be None here if the user was asked for
             # the date and time of the alarm and responded with "nevermind"
@@ -452,7 +451,7 @@ class AlarmSkill(MycroftSkill):
         Raises:
             AlarmValidationException when the user does not supply a date and/or time
         """
-        response = self.get_response("query.for.when", validator=extract_datetime)
+        response = self.get_response("ask-alarm-time", validator=extract_datetime)
         if response is None:
             raise AlarmValidationException("No duration specified")
         else:
@@ -491,7 +490,7 @@ class AlarmSkill(MycroftSkill):
             else:
                 alarm_in_past = True
         if alarm_in_past:
-            self.speak_dialog("alarm.past")
+            self.speak_dialog("alarm-in-past")
             raise AlarmValidationException("Requested alarm in the past")
 
     def _assign_alarm_name(self) -> str:
@@ -541,15 +540,15 @@ class AlarmSkill(MycroftSkill):
                 utterance, self.translations.repeat_phrases
             )
             if repeat_rule is None:
-                response = self.get_response("query.recurrence")
+                response = self.get_response("ask-alarm-recurrence")
                 if response:
                     repeat_rule = build_day_of_week_repeat_rule(
                         response, self.translations.repeat_phrases
                     )
 
         # TODO: remove days following an "except" in the utterance
-        if self.voc_match(utterance, "Except"):
-            self.speak_dialog("no.exceptions.yet", wait=True)
+        if self.voc_match(utterance, "except"):
+            self.speak_dialog("no-exceptions-yet", wait=True)
 
         return repeat_rule
 
@@ -578,11 +577,11 @@ class AlarmSkill(MycroftSkill):
                 break
 
         if duplicate_alarm_found:
-            self.speak_dialog("alarm.already.exists", wait=True)
+            self.speak_dialog("alarm-exists", wait=True)
             raise AlarmValidationException("Requested alarm already exists")
 
         if duplicate_name_found:
-            self.speak_dialog("alarm.already.exists", wait=True)
+            self.speak_dialog("alarm-exists", wait=True)
             raise AlarmValidationException(f"Alarm named '{alarm.name}' already exists")
 
     def _speak_new_alarm(self, alarm: Alarm):
@@ -594,12 +593,12 @@ class AlarmSkill(MycroftSkill):
         relative_time = nice_relative_time(alarm.date_time)
         if alarm.repeat_rule is None:
             self.speak_dialog(
-                "alarm.scheduled.for.time",
+                "alarm-scheduled",
                 data={"time": alarm.description, "rel": relative_time},
             )
         else:
             self.speak_dialog(
-                "recurring.alarm.scheduled.for.time",
+                "alarm-scheduled-recurring",
                 data=dict(time=alarm.description, rel=relative_time),
             )
 
@@ -622,7 +621,7 @@ class AlarmSkill(MycroftSkill):
                     self._send_alarm_status()
         else:
             self.log.info("No active alarms to cancel")
-            self.speak_dialog("alarms.list.empty", wait=True)
+            self.speak_dialog("no-active-alarms", wait=True)
         self.change_state("inactive")
 
     def _determine_which_alarms_to_cancel(self, utterance: str) -> List[Alarm]:
@@ -644,7 +643,7 @@ class AlarmSkill(MycroftSkill):
             elif len(self.active_alarms) == 1:
                 matches = [self.active_alarms[0]]
             else:
-                matches = self._disambiguate_request(question="ask.which.alarm.delete")
+                matches = self._disambiguate_request(question="ask-which-alarm-delete")
         else:
             matcher.match()
             matches = matcher.matches
@@ -671,9 +670,9 @@ class AlarmSkill(MycroftSkill):
             alarm: the alarm to cancel
         """
         if alarm.repeat_rule is None:
-            dialog = "alarm.cancelled.desc"
+            dialog = "cancelled-single"
         else:
-            dialog = "alarm.cancelled.desc.recurring"
+            dialog = "cancelled-single-recurring"
         self.speak_dialog(dialog, data=dict(desc=alarm.description))
         self._display_alarms([alarm])
         self.log.info(f"Cancelling alarm {alarm.description}")
@@ -685,7 +684,7 @@ class AlarmSkill(MycroftSkill):
         Args:
             alarms: the alarms to cancel
         """
-        self.speak_dialog("alarm.cancelled.multi", data=dict(count=len(alarms)))
+        self.speak_dialog("cancelled-multiple", data=dict(count=len(alarms)))
         self._display_alarms(alarms)
         for alarm in alarms:
             self.log.info(f"Cancelling alarm {alarm.description}")
@@ -703,7 +702,7 @@ class AlarmSkill(MycroftSkill):
             if matches is not None:
                 self._report_matched_alarms(matches)
         else:
-            self.speak_dialog("alarms.list.empty")
+            self.speak_dialog("no-active-alarms")
         self.change_state("inactive")
 
     def _determine_which_alarms_to_report(self, utterance: str) -> List[Alarm]:
@@ -735,7 +734,7 @@ class AlarmSkill(MycroftSkill):
         if not matches:
             self.speak_dialog("alarms.not.found")
         elif len(matches) == 1:
-            dialog_name = "alarms.list.single"
+            dialog_name = "single-active-alarm"
             alarm = matches[0]
             relative_time = nice_relative_time(alarm.date_time)
             dialog_data = dict(item=alarm.description, duration=relative_time)
@@ -743,7 +742,7 @@ class AlarmSkill(MycroftSkill):
         else:
             descriptions = [alarm.description for alarm in matches]
             dialog_data = dict(count=len(matches), items=descriptions)
-            self.speak_dialog("alarms.list.multi", dialog_data)
+            self.speak_dialog("multiple-active-alarms", dialog_data)
         self._display_alarms(matches)
 
     def _snooze_alarm(self, utterance: str):
@@ -791,7 +790,7 @@ class AlarmSkill(MycroftSkill):
                 reply, self.active_alarms, self.resource_file_locator, self.translations
             )
             if matcher.no_match_criteria:
-                self.speak_dialog("alarms.not.found")
+                self.speak_dialog("alarm-not-found")
             else:
                 matcher.match()
                 matches = matcher.matches

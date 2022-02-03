@@ -87,14 +87,14 @@ class Alarm:
             use_24_hour: boolean indicating if the time should use the 24 hour format.
         """
         if self.repeat_rule:
-            dialog_name = "recurring.alarm.named"
+            dialog_name = "alarm-description-recurring"
             rule_description = build_repeat_rule_description(
                 self.repeat_rule, translations
             )
             speakable_time = self._get_speakable_time(use_24_hour)
             dialog_data = dict(time=speakable_time, recurrence=rule_description)
         else:
-            dialog_name = "alarm.named"
+            dialog_name = "alarm-description"
             speakable_datetime = self._get_speakable_date_time(use_24_hour)
             dialog_data = dict(datetime=speakable_datetime)
         dialog_data.update(name=self.name)
