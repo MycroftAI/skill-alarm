@@ -36,7 +36,7 @@ Feature: Alarm skill functionality
      And the user replies "8:00 am"
      And "mycroft-alarm" should reply with dialog from "alarm.scheduled.for.time.dialog"
 
-  Examples: set alarm withot saying a time
+  Examples: set alarm without saying a time
     | set alarm without saying a time |
     | set alarm |
     | set an alarm |
@@ -317,6 +317,7 @@ Feature: Alarm skill functionality
      | show me my alarms |
      | when will my alarm go off |
      | when's my alarm |
+     | are there any alarms set for this evening |
 
   @xfail
   # Jira MS-71 https://mycroft.atlassian.net/browse/MS-71
