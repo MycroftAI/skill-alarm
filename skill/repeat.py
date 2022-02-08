@@ -65,12 +65,12 @@ def determine_next_occurrence(repeat_rule: str, start_datetime: datetime):
     return next_occurrence
 
 
-def build_repeat_rule_description(repeat_rule: str, translations) -> str:
+def build_repeat_rule_description(repeat_rule: str, static_resources) -> str:
     """Create a textual description of the repeat rule.
 
     Arguments:
         repeat_rule: iCal encoded string representing the alarm repeating
-        translations: words translated to the language in use
+        static_resources: words translated to the language in use
 
     Returns:
         Phrase representing the days the alarm repeats
@@ -79,7 +79,7 @@ def build_repeat_rule_description(repeat_rule: str, translations) -> str:
     day_names = []
     days_of_week = convert_day_of_week(repeat_rule)
     day_numbers = days_of_week.split()
-    for phrase, days in translations.repeat_phrases.items():
+    for phrase, days in static_resources.repeat_phrases.items():
         if days == days_of_week:
             repeat_description = phrase
             break  # accept the first perfect match
@@ -87,7 +87,7 @@ def build_repeat_rule_description(repeat_rule: str, translations) -> str:
             day_names.append(phrase)
 
     if repeat_description is None:
-        repeat_description = join_list(day_names, translations.and_word)
+        repeat_description = join_list(day_names, static_resources.and_word)
 
     return repeat_description
 

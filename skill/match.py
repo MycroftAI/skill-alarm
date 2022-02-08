@@ -25,23 +25,23 @@ from .repeat import build_day_of_week_repeat_rule
 class AlarmMatcher:
     """Matches alarms to a request made by the user."""
 
-    def __init__(self, utterance: str, alarms: List[Alarm], file_locator, translations):
+    def __init__(self, utterance: str, alarms: List[Alarm], static_resources):
         self.utterance = utterance
         self.alarms = alarms
         self.matches = []
-        self._help_lingua_franca(translations)
+        self._help_lingua_franca(static_resources)
         self.requested_repeat_rule = build_day_of_week_repeat_rule(
-            utterance, translations.repeat_phrases
+            utterance, static_resources.repeat_phrases
         )
-        self.requested_datetime, self.utterance = extract_alarm_datetime(utterance)
-        self.requested_name = self._extract_alarm_name(file_locator)
+        self.requested_datetime, _ = extract_alarm_datetime(utterance)
+        self.requested_name = self._extract_alarm_name(static_resources)
         LOG.info(f"requested repeat rule: {self.requested_repeat_rule}")
         utterance_words = self.utterance.split()
         self.requested_all = any(
-            word in utterance_words for word in translations.all_words
+            word in utterance_words for word in static_resources.all_words
         )
         self.requested_next = any(
-            word in utterance_words for word in translations.next_words
+            word in utterance_words for word in static_resources.next_words
         )
 
     def _help_lingua_franca(self, translations):
@@ -64,7 +64,7 @@ class AlarmMatcher:
                         break
                 break
 
-    def _extract_alarm_name(self, file_locator) -> Optional[str]:
+    def _extract_alarm_name(self, static_resources) -> Optional[str]:
         """Attempts to extract a alarm name from an utterance.
 
         If the regex name matching logic returns no matches, it might be
@@ -75,7 +75,7 @@ class AlarmMatcher:
         Returns:
             a matched alarm name or None if no match found
         """
-        name_extractor = RegexExtractor(file_locator, "name")
+        name_extractor = RegexExtractor("name", static_resources.name_regex)
         alarm_name = name_extractor.extract(self.utterance)
         if alarm_name is None:
             # Attempt to extract a name from a "cancel alarm" utterance
@@ -130,8 +130,8 @@ class AlarmMatcher:
             Alarm matching the name requested by the user.
         """
         for alarm in self.alarms:
-            match = alarm.name == self.utterance or (
-                self.requested_name is not None and alarm.name == self.requested_name
+            match = alarm.name == self.requested_name or alarm.name == "alarm " + str(
+                self.requested_name
             )
             if match:
                 self.matches.append(alarm)
