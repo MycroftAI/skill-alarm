@@ -78,18 +78,17 @@ class Alarm:
             alarmDays=display_days.title(),
         )
 
-    def build_description(self, translator, translations, use_24_hour):
+    def build_description_dialog(self, resources, use_24_hour):
         """Builds a speakable description of the alarm using its attributes.
 
         Args:
-            translator: object used for translating dialog files
-            translations: static translations of words into user's selected language.
+            resources: static translations of words into user's selected language.
             use_24_hour: boolean indicating if the time should use the 24 hour format.
         """
         if self.repeat_rule:
             dialog_name = "alarm-description-recurring"
             rule_description = build_repeat_rule_description(
-                self.repeat_rule, translations
+                self.repeat_rule, resources
             )
             speakable_time = self._get_speakable_time(use_24_hour)
             dialog_data = dict(time=speakable_time, recurrence=rule_description)
@@ -98,7 +97,8 @@ class Alarm:
             speakable_datetime = self._get_speakable_date_time(use_24_hour)
             dialog_data = dict(datetime=speakable_datetime)
         dialog_data.update(name=self.name)
-        self.description = translator.translate_dialog(dialog_name, dialog_data)
+
+        return dialog_name, dialog_data
 
     def _get_speakable_time(self, use_24_hour: bool) -> str:
         """Formats the alarm time into a speakable string.

@@ -2,4 +2,6 @@
 \b^.*alarm.* (called|for|named) (?P<name>.*)$
 \b^.* alarm (?P<name>.*) (every|for|on|at).*$
 \b^.* (?P<name>.*) alarm$
-cancel alarm (?P<name>.*)
+^cancel (?P<name>.*) alarm
+^cancel alarm (?P<name>.*)$
+^alarm (?P<name>.*)$
