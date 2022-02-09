@@ -226,6 +226,7 @@ class AlarmSkill(MycroftSkill):
         .require("set")
         .optionally("recurring")
         .optionally("recurrence")
+        .exclude("query")
     )
     def handle_set_alarm(self, message: Message):
         """Handles request to set alarm from utterance like "set an alarm for...".
