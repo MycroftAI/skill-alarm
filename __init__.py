@@ -43,8 +43,8 @@ MARK_II = "mycroft_mark_2"
 USE_24_HOUR = "full"
 TEN_MINUTES = 600
 
-Resources = namedtuple(
-    "Resources",
+StaticResources = namedtuple(
+    "StaticResources",
     [
         "all_words",
         "and_word",
@@ -169,11 +169,7 @@ class AlarmSkill(MycroftSkill):
 
     def handle_mycroft_ready(self):
         """Does the things that need to happen when the device is ready for use."""
-        self._remove_old_alarms()
-        self._update_old_repeating_alarms()
-        self.add_event(
-            "skill.idle.displayed", self._initialize_active_alarms, once=True
-        )
+        self._clear_expired_alarms()
 
     def _initialize_active_alarms(self):
         """Shows expired alarms and schedules the next alarm when the skill loads."""
@@ -185,7 +181,7 @@ class AlarmSkill(MycroftSkill):
         """Gets a set of static words in the language specified in the configuration."""
         date_time_format.cache(self.lang)
         date_time_translations = date_time_format.lang_config[self.lang]
-        self.static_resources = Resources(
+        self.static_resources = StaticResources(
             all_words=self.resources.load_list_file("all"),
             and_word=self.resources.load_dialog_file("and"),
             dismiss_words=self.resources.load_list_file("dismiss"),
@@ -223,28 +219,6 @@ class AlarmSkill(MycroftSkill):
         event_data = {"active_alarms": bool(self.active_alarms)}
         event = message.response(data=event_data)
         self.bus.emit(event)
-
-    def _remove_old_alarms(self):
-        """Removes alarms that have expired since last skill load."""
-        load_datetime = now_local()
-        alarms_to_remove = list()
-        for alarm in self.active_alarms:
-            if alarm.date_time < (load_datetime - timedelta(minutes=5)):
-                alarms_to_remove.append(alarm)
-        for alarm in alarms_to_remove:
-            if alarm.repeat_rule is None:
-                self.active_alarms.remove(alarm)
-
-    def _update_old_repeating_alarms(self):
-        """Ensures the next occurrence of a repeating alarm is in the future."""
-        load_datetime = now_local()
-        for alarm in self.active_alarms:
-            schedule_next_occurrence = (
-                alarm.date_time < (load_datetime - timedelta(minutes=5))
-                and alarm.repeat_rule is not None
-            )
-            if schedule_next_occurrence:
-                alarm.calculate_next_occurrence()
 
     @intent_handler(
         AdaptIntent("")
