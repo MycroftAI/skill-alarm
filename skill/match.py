@@ -35,7 +35,6 @@ class AlarmMatcher:
         )
         self.requested_datetime, _ = extract_alarm_datetime(utterance)
         self.requested_name = self._extract_alarm_name(static_resources)
-        LOG.info(f"requested repeat rule: {self.requested_repeat_rule}")
         utterance_words = self.utterance.split()
         self.requested_all = any(
             word in utterance_words for word in static_resources.all_words

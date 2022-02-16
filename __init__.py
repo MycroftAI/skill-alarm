@@ -460,8 +460,8 @@ class AlarmSkill(MycroftSkill):
         if alarm_datetime <= now_local():
             if alarm_datetime.date() == date.today():
                 today_in_utterance = (
-                        self.static_resources.today in utterance
-                        or self.static_resources.tonight in utterance
+                    self.static_resources.today in utterance
+                    or self.static_resources.tonight in utterance
                 )
                 if today_in_utterance:
                     alarm_in_past = True
@@ -671,11 +671,13 @@ class AlarmSkill(MycroftSkill):
         self.speak_dialog(dialog, data=dict(desc=alarm.description))
         self._display_alarms([alarm])
         self.log.info(f"Cancelling alarm {alarm.description}")
+        if alarm in self.expired_alarms:
+            self._stop_beeping()
         self.active_alarms.remove(alarm)
         self._clear_display_after_speaking()
 
     def _cancel_multiple(self, alarms: List[Alarm]):
-        """Cancel a single alarm.
+        """Cancels multiple alarms.
 
         Args:
             alarms: the alarms to cancel
@@ -684,6 +686,8 @@ class AlarmSkill(MycroftSkill):
         self._display_alarms(alarms)
         for alarm in alarms:
             self.log.info(f"Cancelling alarm {alarm.description}")
+            if alarm in self.expired_alarms:
+                self._stop_beeping()
             self.active_alarms.remove(alarm)
         self._clear_display_after_speaking()
 
@@ -711,9 +715,7 @@ class AlarmSkill(MycroftSkill):
         Returns:
             all alarms that match the criteria specified by the user
         """
-        matcher = AlarmMatcher(
-            utterance, self.active_alarms, self.static_resources
-        )
+        matcher = AlarmMatcher(utterance, self.active_alarms, self.static_resources)
         if matcher.no_match_criteria:
             matches = self.active_alarms
         else:
@@ -784,9 +786,7 @@ class AlarmSkill(MycroftSkill):
         matches = None
         reply = self._ask_which_alarm(self.active_alarms, question)
         if reply is not None:
-            matcher = AlarmMatcher(
-                reply, self.active_alarms, self.static_resources
-            )
+            matcher = AlarmMatcher(reply, self.active_alarms, self.static_resources)
             if matcher.no_match_criteria:
                 self.speak_dialog("alarm-not-found")
             else:
