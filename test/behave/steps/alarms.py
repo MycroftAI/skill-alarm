@@ -2,31 +2,49 @@ import time
 
 from behave import given, then
 
-from mycroft.audio import wait_while_speaking
 from mycroft.skills.api import SkillApi
+from test.integrationtests.voight_kampff import (
+    emit_utterance,
+    VoightKampffDialogMatcher,
+)
 
-from test.integrationtests.voight_kampff import emit_utterance, wait_for_dialog
+CANCEL_RESPONSES = (
+    "cancelled-multiple",
+    "cancelled-single",
+    "cancelled-single-recurring",
+    "no-active-alarms",
+)
 
 
-@given('an alarm is set for {alarm_time}')
+@given("an alarm is set for {alarm_time}")
 def given_set_alarm(context, alarm_time):
-    emit_utterance(context.bus, 'set an alarm for {}'.format(alarm_time))
-    wait_for_dialog(context.bus, ['alarm.scheduled.for.time'])
+    emit_utterance(context.bus, "set an alarm for {}".format(alarm_time))
+    dialog_matcher = VoightKampffDialogMatcher(context, ["alarm-scheduled"])
+    dialog_matcher.match()
     context.bus.clear_messages()
 
 
-@given('there are no previous alarms set')
-def given_no_alarms(context):
-    SkillApi.connect_bus(context.bus)
-    alarm_skill = SkillApi.get('mycroft-alarm.mycroftai')
-    alarm_skill.delete_all_alarms()
-    active_alarms = alarm_skill.get_active_alarms()
-    assert(len(active_alarms) == 0)
+@given("no active alarms")
+def reset_alarms(context):
+    """Cancel all active timers to test how skill behaves when no timers are set."""
+    time.sleep(2)
+    _cancel_all_alarms(context)
 
 
-@given('an alarm is expired and beeping')
+def _cancel_all_alarms(context):
+    """Cancel all active alarms.
+
+    If one of the expected responses is not spoken, cause the step to error out.
+    """
+    emit_utterance(context.bus, "cancel all alarms")
+    dialog_matcher = VoightKampffDialogMatcher(context, CANCEL_RESPONSES)
+    match_found, error_message = dialog_matcher.match()
+    assert match_found, error_message
+
+
+@given("an alarm is expired and beeping")
 def given_expired_alarm(context):
-    emit_utterance(context.bus, 'set an alarm in 10 seconds')
+    emit_utterance(context.bus, "set an alarm in 10 seconds")
     time.sleep(12)
 
 
@@ -34,5 +52,5 @@ def given_expired_alarm(context):
 def then_stop_beeping(context):
     time.sleep(2)
     SkillApi.connect_bus(context.bus)
-    alarm_skill = SkillApi.get('mycroft-alarm.mycroftai')
-    assert(not alarm_skill.is_alarm_expired())
+    alarm_skill = SkillApi.get("mycroft-alarm.mycroftai")
+    assert not alarm_skill.is_alarm_expired()
