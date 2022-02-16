@@ -837,7 +837,7 @@ class AlarmSkill(MycroftSkill):
         """Clears the GUI displaying on the screen after the dialog has been spoken."""
         if self.gui.connected:
             wait_while_speaking()
-            self.gui.clear()
+            self.gui.release()
 
     def _show_on_faceplate(self, alarm):
         """Animated confirmation of the alarm.

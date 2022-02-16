@@ -4,3 +4,4 @@ mycroft
 
 # Pycharm project files
 .idea/
+.wh.*
