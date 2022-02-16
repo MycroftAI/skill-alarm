@@ -20,7 +20,7 @@
 #   set a feed dogs alarm
 #   create a wake up alarm
 #   cancel the take medicine alarm
-\b^.*(a|of|the) (?P<Name>.*) alarm
+\b^.*(a|of|the) (?P<name>.*) alarm
 
 # Intended Matches:
 #   set wake up alarm
@@ -29,11 +29,11 @@
 #   set a alarm
 #   set another alarm
 #   cancel the alarm
-^(start|set|create|begin|need|give|make) (?P<Name>.*)(?<!\ba)(?<!another)(?<!\bmy)(?<!one more)(?<!\bthe) alarm$
-^(cancel|clear|delete|disable|end|kill|remove|stop) (?P<Name>.*)(?<!\ba)(?<!another)(?<!\bmy)(?<!one more)(?<!\bthe) alarm$
+^(start|set|create|begin|need|give|make) (?P<name>.*)(?<!\ba)(?<!another)(?<!\bmy)(?<!one more)(?<!\bthe) alarm$
+^(cancel|clear|delete|disable|end|kill|remove|stop) (?P<name>.*)(?<!\ba)(?<!another)(?<!\bmy)(?<!one more)(?<!\bthe) alarm$
 
 # Intended to match a cancel request for "alarm X"
-^(cancel|clear|delete|disable|end|kill|remove|stop) alarm (?P<Name>.*)$
+^(cancel|clear|delete|disable|end|kill|remove|stop) alarm (?P<name>.*)$
 
 # Intended to match a reply to a "which alarm" question when the answer is "alarm 2"
-^alarm (?P<Name>.*)$
+^alarm (?P<name>.*)$
