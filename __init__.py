@@ -170,6 +170,7 @@ class AlarmSkill(MycroftSkill):
     def handle_mycroft_ready(self):
         """Does the things that need to happen when the device is ready for use."""
         self._clear_expired_alarms()
+        self._send_alarm_status()
 
     def _initialize_active_alarms(self):
         """Shows expired alarms and schedules the next alarm when the skill loads."""
@@ -944,6 +945,7 @@ class AlarmSkill(MycroftSkill):
         self._clear_expired_alarms()
         self._schedule_next_alarm()
         self._save_alarms()
+        self._send_alarm_status()
 
     def _stop_beeping(self):
         """Stop playing the beeping sound that plays when an alarm expires."""
