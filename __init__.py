@@ -170,6 +170,7 @@ class AlarmSkill(MycroftSkill):
     def handle_mycroft_ready(self):
         """Does the things that need to happen when the device is ready for use."""
         self._clear_expired_alarms()
+        self._schedule_next_alarm()
         self._send_alarm_status()
 
     def _initialize_active_alarms(self):
@@ -975,7 +976,6 @@ class AlarmSkill(MycroftSkill):
         self.active_alarms.sort(key=lambda _alarm: _alarm.date_time)
 
     def _schedule_next_alarm(self):
-        """"""
         local_date_time = now_local()
         for alarm in self.active_alarms:
             self.cancel_scheduled_event("NextAlarm")
