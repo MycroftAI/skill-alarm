@@ -29,8 +29,8 @@
 #   set a alarm
 #   set another alarm
 #   cancel the alarm
-^(start|set|create|begin|need|give|make) (?P<name>.*)(?<!\ba)(?<!another)(?<!\bmy)(?<!one more)(?<!\bthe) alarm$
-^(cancel|clear|delete|disable|end|kill|remove|stop) (?P<name>.*)(?<!\ba)(?<!another)(?<!\bmy)(?<!one more)(?<!\bthe) alarm$
+^(start|set|create|begin|need|give|make) (?P<name>.*)(?<!\ban)(?<!another)(?<!\bmy)(?<!one more)(?<!\bthe) alarm$
+^(cancel|clear|delete|disable|end|kill|remove|stop) (?P<name>.*)(?<!\ban)(?<!another)(?<!\bmy)(?<!one more)(?<!\bthe) alarm$
 
 # Intended to match a cancel request for "alarm X"
 ^(cancel|clear|delete|disable|end|kill|remove|stop) alarm (?P<name>.*)$
