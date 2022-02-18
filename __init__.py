@@ -1067,8 +1067,13 @@ class AlarmSkill(MycroftSkill):
 
     def _save_alarms(self):
         """Write a serialized version of the data to the specified file name."""
-        with open(self.save_path, "wb") as data_file:
-            pickle.dump(self.active_alarms, data_file, pickle.HIGHEST_PROTOCOL)
+        if self.active_alarms:
+            with open(self.save_path, "wb") as data_file:
+                pickle.dump(self.active_alarms, data_file, pickle.HIGHEST_PROTOCOL)
+        else:
+            if self.save_path.exists():
+                self.save_path.unlink()
+
 
     def _load_alarms(self):
         """Load any saved alarms into the active alarms list."""
