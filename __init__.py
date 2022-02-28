@@ -810,7 +810,7 @@ class AlarmSkill(MycroftSkill):
         alarm_descriptions = [alarm.description for alarm in alarms]
         dialog_data = dict(
             number=len(alarms),
-            list=join_list(alarm_descriptions, self.static_resources.and_word),
+            list=join_list(alarm_descriptions, self.static_resources.and_word[0]),
         )
         reply = self.get_response(dialog=question, data=dialog_data)
 
