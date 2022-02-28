@@ -95,11 +95,7 @@ class AlarmSkill(MycroftSkill):
         self.active_alarms = []
         self.save_path = Path(self.file_system.path).joinpath("saved_alarms")
         self.sound_duration = dict(
-            bell=5,
-            escalate=32,
-            constant_beep=5,
-            beep4=4,
-            chimes=22,
+            bell=5, escalate=32, constant_beep=5, beep4=4, chimes=22,
         )
         self._init_skill_control()
 
@@ -154,13 +150,13 @@ class AlarmSkill(MycroftSkill):
 
     def initialize(self):
         """Executes immediately the constructor for further initialization."""
+        self._load_resources()
         self._load_alarms()
         if self.active_alarms:
             if self.skill_service_initializing:
                 self.add_event("mycroft.ready", self.handle_mycroft_ready, once=True)
             else:
                 self._initialize_active_alarms()
-        self._load_resources()
 
         # TODO: remove the "private.mycroftai.has_alarm" event in favor of the
         #   "skill.alarm.query-active" event.
@@ -1074,6 +1070,7 @@ class AlarmSkill(MycroftSkill):
             if self.save_path.exists():
                 self.save_path.unlink()
 
+        self._cache_cancel_alarm_tts()
 
     def _load_alarms(self):
         """Load any saved alarms into the active alarms list."""
@@ -1081,6 +1078,21 @@ class AlarmSkill(MycroftSkill):
         if self.save_path.exists():
             with open(self.save_path, "rb") as data_file:
                 self.active_alarms = pickle.load(data_file)
+
+        self._cache_cancel_alarm_tts()
+
+    def _cache_cancel_alarm_tts(self):
+        alarms = self.active_alarms
+        if len(alarms) > 1:
+            cache_key = f"{self.skill_id}.cancel-alarm"
+            alarm_descriptions = [alarm.description for alarm in alarms]
+            dialog_data = dict(
+                number=len(alarms),
+                list=join_list(alarm_descriptions, self.static_resources.and_word[0]),
+            )
+            self.cache_dialog(
+                "ask-which-alarm-delete", data=dialog_data, cache_key=cache_key
+            )
 
 
 def create_skill():
