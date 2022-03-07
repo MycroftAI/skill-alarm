@@ -94,6 +94,9 @@ class Alarm:
             dialog_data = dict(time=speakable_time, recurrence=rule_description)
         else:
             dialog_name = "alarm-description"
+            if self.name and (self.name != "alarm"):
+                dialog_name = "alarm-description-named"
+
             speakable_datetime = self._get_speakable_date_time(use_24_hour)
             dialog_data = dict(datetime=speakable_datetime)
         dialog_data.update(name=self.name)

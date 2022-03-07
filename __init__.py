@@ -310,6 +310,15 @@ class AlarmSkill(MycroftSkill):
         with self.activity():
             self.speak_dialog("change-sound", wait=True)
 
+    @intent_handler(AdaptIntent().require("show").require("alarm"))
+    def handle_show_alarms(self, _):
+        """Handles showing the alarms screen if it is hidden."""
+        with self.activity():
+            if self.active_alarms:
+                self._display_alarms(self.active_alarms)
+            else:
+                self.speak_dialog("no-active-alarms", wait=True)
+
     def _set_new_alarm(self, utterance):
         """Start a new alarm as requested by the user.
 
@@ -495,7 +504,9 @@ class AlarmSkill(MycroftSkill):
             max_assigned_number = 0
             for alarm in self.active_alarms:
                 if alarm.name == "alarm":
+                    # Change existing alarm to alarm 1
                     alarm.name = "alarm 1"
+                    alarm.description = self._build_alarm_description(alarm)
                     max_assigned_number = 1
                 elif alarm.name.startswith("alarm "):
                     _, name_number = alarm.name.split()
