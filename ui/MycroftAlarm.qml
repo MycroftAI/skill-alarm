@@ -49,14 +49,17 @@ Rectangle {
         height: alarmCount <= 2 ? gridUnit * 4 : gridUnit * 3
         width: parent.width
 
-        Label {
+        AlarmLabel {
             id: alarmNameValue
-            anchors.baseline: parent.bottom
+            anchors.top: parent.top
+            anchors.topMargin: gridUnit
             anchors.horizontalCenter: parent.horizontalCenter
             color: "#2C3E50"
             font.pixelSize: alarmCount === 1 ? 47 : 35
             font.styleName: "Bold"
+            heightUnits: 5
             text: alarmInfo ? alarmInfo.alarmName : ""
+            maxTextLength: width / 30
         }
     }
 

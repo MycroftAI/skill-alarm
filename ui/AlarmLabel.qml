@@ -30,22 +30,44 @@ squares for alignment of items.
 import QtQuick 2.4
 import QtQuick.Layouts 1.1
 import QtQuick.Controls 2.3
-import QtGraphicalEffects 1.0
+import Mycroft 1.0 as Mycroft
 
 Item {
-    property alias fontSize: alarmLabel.font.pixelSize
-    property alias fontStyle: alarmLabel.font.styleName
-    property alias text: alarmLabel.text
+    property alias font: title.font
+    property alias color: title.color
+    property string text
     property int heightUnits: 0
     property int widthUnits: 0
+    property int maxTextLength: 100
+    property bool centerText: true
 
-    height: heightUnits ? gridUnit * heightUnits : parent.height
-    width: widthUnits ? gridUnit * widthUnits : parent.width
+    height: heightUnits ? Mycroft.Units.gridUnit * heightUnits : parent.height
+    width: widthUnits ? Mycroft.Units.gridUnit * widthUnits : parent.width
+
+    clip: true
 
     Label {
-        id: alarmLabel
-        anchors.baseline: parent.bottom
-        anchors.horizontalCenter: parent.horizontalCenter
-        color: "#FFFFFF"
+        id: title
+        property string spacing: "    "
+        property string combined: parent.text + spacing
+        property string display: {
+            if (parent.text.length > parent.maxTextLength) {
+                combined.substring(step) + combined.substring(0, step)
+            } else {
+                parent.text
+            }
+        }
+        property int step: 0
+
+        text: display
+
+        anchors.horizontalCenter: centerText ? parent.horizontalCenter : undefined
+
+        Timer {
+            interval: 300
+            running: title.parent.text.length > title.parent.maxTextLength
+            repeat: true
+            onTriggered: parent.step = (parent.step + 1) % parent.combined.length
+        }
     }
 }
