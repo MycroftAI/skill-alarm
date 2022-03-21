@@ -43,23 +43,27 @@ Rectangle {
         }
     }
 
-    Item {
+    // Show the alarm name in the center of the card or scroll it horzontally
+    // if it is longer than the width of the card.
+    Marquee {
         id: alarmName
         anchors.top: parent.top
+        anchors.topMargin: gridUnit
+        anchors.left: parent.left
+        anchors.leftMargin: alarmCount > 2 ? gridUnit * 4 : gridUnit * 2
+        color: "#2C3E50"
+        font.pixelSize: alarmCount === 1 ? 47 : 35
+        font.styleName: "Bold"
         height: alarmCount <= 2 ? gridUnit * 4 : gridUnit * 3
-        width: parent.width
-
-        AlarmLabel {
-            id: alarmNameValue
-            anchors.top: parent.top
-            anchors.topMargin: gridUnit
-            anchors.horizontalCenter: parent.horizontalCenter
-            color: "#2C3E50"
-            font.pixelSize: alarmCount === 1 ? 47 : 35
-            font.styleName: "Bold"
-            heightUnits: 5
-            text: alarmInfo ? alarmInfo.alarmName : ""
-            maxTextLength: width / 30
+        text: alarmInfo ? alarmInfo.alarmName : ""
+        width: {
+            if (alarmCount === 1) {
+                return gridUnit * 42
+            } else if (alarmCount === 2) {
+                return gridUnit * 18
+            } else {
+                return gridUnit * 16
+            }
         }
     }
 
