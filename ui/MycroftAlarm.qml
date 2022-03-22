@@ -1,4 +1,4 @@
-        // Copyright 2021, Mycroft AI Inc.
+// Copyright 2021, Mycroft AI Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,6 +11,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+/*
+Representation of a single alarm.
+
+Layout of the alarm card depends on how many alarms are shown on the screen
+at a time. The maximum number of alarms to show on one screen is four.
+*/
 
 import QtQuick 2.4
 import QtQuick.Layouts 1.1
