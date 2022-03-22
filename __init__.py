@@ -467,8 +467,8 @@ class AlarmSkill(MycroftSkill):
         if alarm_datetime <= now_local():
             if alarm_datetime.date() == date.today():
                 today_in_utterance = (
-                    self.static_resources.today in utterance
-                    or self.static_resources.tonight in utterance
+                    self.static_resources.today[0] in utterance
+                    or self.static_resources.tonight[0] in utterance
                 )
                 if today_in_utterance:
                     alarm_in_past = True
