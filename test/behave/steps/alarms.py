@@ -21,6 +21,7 @@ def given_set_alarm(context, alarm_time):
     emit_utterance(context.bus, "set an alarm for {}".format(alarm_time))
     dialog_matcher = VoightKampffDialogMatcher(context, ["alarm-scheduled"])
     dialog_matcher.match()
+    time.sleep(1)
     context.bus.clear_messages()
 
 
