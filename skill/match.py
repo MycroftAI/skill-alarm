@@ -31,7 +31,7 @@ class AlarmMatcher:
         self.matches = []
         self._help_lingua_franca(static_resources)
         self.requested_repeat_rule = build_day_of_week_repeat_rule(
-            utterance, static_resources.repeat_phrases
+            utterance, static_resources.repeat_rules
         )
         self.requested_datetime, _ = extract_alarm_datetime(utterance)
         self.requested_name = self._extract_alarm_name(static_resources)

@@ -54,6 +54,7 @@ StaticResources = namedtuple(
         "name_regex",
         "next_words",
         "repeat_phrases",
+        "repeat_rules",
         "today",
         "tonight",
         "weekdays",
@@ -187,7 +188,8 @@ class AlarmSkill(MycroftSkill):
             months=list(date_time_translations["month"].values()),
             name_regex=self.resources.load_regex_file("name"),
             next_words=self.resources.load_list_file("next"),
-            repeat_phrases=self.resources.load_named_value_file("recurring"),
+            repeat_phrases=self.resources.load_vocabulary_file("recurring"),
+            repeat_rules=self.resources.load_named_value_file("recurring"),
             today=self.resources.load_dialog_file("today"),
             tonight=self.resources.load_dialog_file("tonight"),
             weekdays=list(date_time_translations["weekday"].values()),
@@ -531,17 +533,17 @@ class AlarmSkill(MycroftSkill):
         """
         repeat_rule = None
         repeat_in_utterance = any(
-            [repeat in utterance for repeat in self.static_resources.repeat_phrases]
+            [repeat[0] in utterance for repeat in self.static_resources.repeat_phrases]
         )
         if repeat_in_utterance:
             repeat_rule = build_day_of_week_repeat_rule(
-                utterance, self.static_resources.repeat_phrases
+                utterance, self.static_resources.repeat_rules
             )
             if repeat_rule is None:
                 response = self.get_response("ask-alarm-recurrence")
                 if response:
                     repeat_rule = build_day_of_week_repeat_rule(
-                        response, self.static_resources.repeat_phrases
+                        response, self.static_resources.repeat_rules
                     )
 
         # TODO: remove days following an "except" in the utterance

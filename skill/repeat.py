@@ -79,7 +79,7 @@ def build_repeat_rule_description(repeat_rule: str, static_resources) -> str:
     day_names = []
     days_of_week = convert_day_of_week(repeat_rule)
     day_numbers = days_of_week.split()
-    for phrase, days in static_resources.repeat_phrases.items():
+    for phrase, days in static_resources.repeat_rules.items():
         if days == days_of_week:
             repeat_description = phrase
             break  # accept the first perfect match
