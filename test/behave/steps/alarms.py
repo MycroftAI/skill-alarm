@@ -31,15 +31,6 @@ def reset_alarms(context):
     _cancel_all_alarms(context)
 
 
-@given("there are no previous alarms set")
-def given_no_alarms(context):
-    SkillApi.connect_bus(context.bus)
-    alarm_skill = SkillApi.get("mycroft-alarm.mycroftai")
-    alarm_skill.delete_all_alarms()
-    active_alarms = alarm_skill.get_active_alarms()
-    assert len(active_alarms) == 0
-
-
 def _cancel_all_alarms(context):
     """Cancel all active alarms.
 
