@@ -2,6 +2,7 @@ import time
 
 from behave import given, then
 
+from mycroft.messagebus.message import Message
 from mycroft.skills.api import SkillApi
 from test.integrationtests.voight_kampff import (
     emit_utterance,
@@ -52,6 +53,6 @@ def given_expired_alarm(context):
 @then('"mycroft-alarm" should stop beeping')
 def then_stop_beeping(context):
     time.sleep(2)
-    SkillApi.connect_bus(context.bus)
-    alarm_skill = SkillApi.get("mycroft-alarm.mycroftai")
-    assert not alarm_skill.is_alarm_expired()
+    response = context.bus.wait_for_response(Message("skill.alarm.query-expired"))
+    if response and response.data.get("expired_alarms"):
+        assert not response.data["expired_alarms"]

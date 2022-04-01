@@ -163,6 +163,7 @@ class AlarmSkill(MycroftSkill):
         #   "skill.alarm.query-active" event.
         self.add_event("private.mycroftai.has_alarm", self.handle_has_alarm)
         self.add_event("skill.alarm.query-active", self.handle_active_alarm_query)
+        self.add_event("skill.alarm.query-expired", self.handle_expired_alarm_query)
 
     def handle_mycroft_ready(self):
         """Does the things that need to happen when the device is ready for use."""
@@ -217,6 +218,22 @@ class AlarmSkill(MycroftSkill):
             f"Responding to active alarm query with: {bool(self.active_alarms)}"
         )
         event_data = {"active_alarms": bool(self.active_alarms)}
+        event = message.response(data=event_data)
+        self.bus.emit(event)
+
+    def handle_expired_alarm_query(self, message: Message):
+        """Emits an event indicating whether or not there are any expired alarms.
+
+        In this case, an "expired alarm" is defined as any alarms that have passed
+        their trigger time and not yet been cleared.
+
+        Args:
+            message: the message that triggered this event
+        """
+        self.log.info(
+            f"Responding to expired alarm query with: {bool(self.expired_alarms)}"
+        )
+        event_data = {"expired_alarms": bool(self.expired_alarms)}
         event = message.response(data=event_data)
         self.bus.emit(event)
 
