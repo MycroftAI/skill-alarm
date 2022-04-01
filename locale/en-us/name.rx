@@ -36,4 +36,5 @@
 ^(cancel|clear|delete|disable|end|kill|remove|stop) alarm (?P<name>.*)$
 
 # Intended to match a reply to a "which alarm" question when the answer is "alarm 2"
-^alarm (?P<name>.*)$
+# Exclude name of "status" to allow simple intent: "alarm status"
+^alarm (?P<name>.*)(?<!\bstatus)$
