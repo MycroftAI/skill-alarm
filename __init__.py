@@ -1083,7 +1083,9 @@ class AlarmSkill(MycroftSkill):
             if self.save_path.exists():
                 self.save_path.unlink()
 
-        self._cache_cancel_alarm_tts()
+        # Non-blocking execution of caching
+        now = 0
+        self.schedule_event(self._cache_cancel_alarm_tts, now)
 
     def _load_alarms(self):
         """Load any saved alarms into the active alarms list."""
