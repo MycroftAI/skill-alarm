@@ -71,13 +71,13 @@ Feature: Set a recurring alarm
   Scenario Outline: user sets recurring named alarm
     Given an english speaking user
      And no active alarms
-     When the user says "<set recurring alarm request>"
-     Then "mycroft-alarm" should reply with dialog from "ask-alarm-time"
+     When the user says "<set recurring named alarm request>"
+     Then "mycroft-alarm" should reply with dialog from "ask-alarm-recurrence"
      And the user says "<days>"
      And "mycroft-alarm" should reply with dialog from "alarm-scheduled-recurring"
 
   Examples:
-   | set recurring alarm request | days |
+   | set recurring named alarm request | days |
    | set a recurring alarm named lunch for 1 pm | every day |
    | set a recurring alarm named wake up for 8 am | weekdays |
    | set a recurring alarm for 12 pm | tuesday |
