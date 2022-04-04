@@ -56,7 +56,8 @@ Feature: Set a non-recurring alarm
     | set alarm request | dismissal request |
     | set an alarm | nevermind |
     | create an alarm | cancel |
-    | set an alarm | no |
+    | set an alarm | forget about it |
+    | set an alarm | stop |
 
   Scenario Outline: user sets an alarm with a name with a time
     Given an english speaking user

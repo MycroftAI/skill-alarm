@@ -455,7 +455,8 @@ class AlarmSkill(MycroftSkill):
         Raises:
             AlarmValidationException when the user does not supply a date and/or time
         """
-        response = self.get_response("ask-alarm-time", validator=extract_datetime)
+        response = self.get_response("ask-alarm-time",
+                                     validator=self._validate_response_has_datetime)
         if response is None:
             raise AlarmValidationException("No duration specified")
         else:
@@ -464,13 +465,24 @@ class AlarmSkill(MycroftSkill):
                 alarm_datetime = None
             else:
                 alarm_datetime = extract[0]
-            dismiss = any(
-                [word in response for word in self.static_resources.dismiss_words]
-            )
-            if alarm_datetime is None and not dismiss:
+
+            if alarm_datetime is None:
                 raise AlarmValidationException("No duration specified")
 
         return alarm_datetime
+
+    def _validate_response_has_datetime(self, utterance: str) -> bool:
+        """Validate a response contains an extractable datetime or dismissal.
+
+        Note: Using extract_datetime directly as a validator prevents the use
+        of custom dismissal vocab. General terms included in core like
+        'cancel' will work, but this validator adds anything in dismiss.list
+        """
+        extracted_dt = extract_datetime(utterance) is not None
+        dismissed = any(
+                [word in utterance for word in self.static_resources.dismiss_words]
+            )
+        return extracted_dt or dismissed
 
     def _check_for_alarm_in_past(self, utterance: str, alarm_datetime: datetime):
         """Determines if the requested alarm date and time is in the past
