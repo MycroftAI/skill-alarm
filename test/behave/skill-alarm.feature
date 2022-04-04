@@ -145,9 +145,7 @@ Feature: Alarm skill functionality
      And no active alarms
      And an alarm is set for 9:00 am on monday
      When the user says "<delete alarm>"
-     Then "mycroft-alarm" should reply with dialog from "ask.cancel.desc.alarm.dialog"
-     And the user says "yes"
-     And "mycroft-alarm" should reply with dialog from "alarm.cancelled.desc.dialog"
+     Then "mycroft-alarm" should reply with dialog from "cancelled-single.dialog"
 
   Examples: delete an alarm when a single alarm is active
     | delete alarm |
@@ -159,22 +157,6 @@ Feature: Alarm skill functionality
     | abort alarm |
     | remove alarm |
 
-  Scenario Outline: user starts to delete a single alarm but then cancels
-    Given an english speaking user
-     And no active alarms
-     And an alarm is set for 9:00 am on monday
-     When the user says "delete alarm"
-     Then "mycroft-alarm" should reply with dialog from "ask.cancel.desc.alarm.dialog"
-     And the user says "<no>"
-     And "mycroft-alarm" should reply with dialog from "alarm.delete.cancelled.dialog"
-
-  Examples: user starts to delete a single alarm but then cancels
-    | no |
-    | no |
-    | nevermind |
-    | forget it |
-    | cancel |
-
 
   @xfail
   # Jira MS-74 https://mycroft.atlassian.net/browse/MS-74
@@ -184,11 +166,11 @@ Feature: Alarm skill functionality
      And an alarm is set for 9:00 am on monday
      And an alarm is set for 10:00 pm on friday
      When the user says "<delete alarm>"
-     Then "mycroft-alarm" should reply with dialog from "ask.which.alarm.delete.dialog"
+     Then "mycroft-alarm" should reply with dialog from "ask-which-alarm-delete.dialog"
      And the user says "9:00 am"
      And "mycroft-alarm" should reply with dialog from "ask.cancel.desc.alarm.dialog"
      And the user says "yes"
-     And "mycroft-alarm" should reply with dialog from "alarm.cancelled.desc.dialog"
+     And "mycroft-alarm" should reply with dialog from "cancelled-single.dialog"
 
   Examples: delete an alarm when multiple alarm are active
     | delete alarm |
