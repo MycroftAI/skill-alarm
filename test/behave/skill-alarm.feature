@@ -157,9 +157,6 @@ Feature: Alarm skill functionality
     | abort alarm |
     | remove alarm |
 
-
-  @xfail
-  # Jira MS-74 https://mycroft.atlassian.net/browse/MS-74
   Scenario Outline: user deletes an alarm when multiple alarms are active
     Given an english speaking user
      And no active alarms
@@ -168,8 +165,6 @@ Feature: Alarm skill functionality
      When the user says "<delete alarm>"
      Then "mycroft-alarm" should reply with dialog from "ask-which-alarm-delete.dialog"
      And the user says "9:00 am"
-     And "mycroft-alarm" should reply with dialog from "ask.cancel.desc.alarm.dialog"
-     And the user says "yes"
      And "mycroft-alarm" should reply with dialog from "cancelled-single.dialog"
 
   Examples: delete an alarm when multiple alarm are active
@@ -190,9 +185,7 @@ Feature: Alarm skill functionality
      And an alarm is set for 9:00 am on monday
      And an alarm is set for 10:00 pm on friday
      When the user says "<delete specific alarm>"
-     Then "mycroft-alarm" should reply with dialog from "ask.cancel.desc.alarm.dialog"
-     And the user says "yes"
-     And "mycroft-alarm" should reply with dialog from "alarm.cancelled.desc.dialog"
+     And "mycroft-alarm" should reply with dialog from "cancelled-single.dialog"
 
   Examples: delete an alarm when multiple alarm are active
     | delete specific alarm |
@@ -210,9 +203,7 @@ Feature: Alarm skill functionality
      And an alarm is set for 9:00 am on monday
      And an alarm is set for 10:00 pm on friday
      When the user says "<delete all alarms>"
-     Then "mycroft-alarm" should reply with dialog from "ask.cancel.alarm.plural.dialog"
-     And the user says "yes"
-     And "mycroft-alarm" should reply with dialog from "alarm.cancelled.multi.dialog"
+     Then "mycroft-alarm" should reply with dialog from "cancelled-multiple.dialog"
 
   Examples: delete an alarm when multiple alarm are active
     | delete all alarms |
