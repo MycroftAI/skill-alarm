@@ -1196,9 +1196,6 @@ class AlarmSkill(MycroftSkill):
         self.change_state("active")
         self._stop_beeping()
         self.active_alarms = []
-        if len(self.active_alarms) > 0:
-            self.log.error("Failed to remove all alarms")
-            self.change_state("inactive")
         self.cancel_scheduled_event("NextAlarm")
         self._send_alarm_status()
         self.change_state("inactive")
