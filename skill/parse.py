@@ -20,14 +20,14 @@ from mycroft.util.parse import extract_datetime
 
 
 def extract_alarm_datetime(utterance: str) -> Tuple[Optional[datetime], str]:
-    """Extract duration in seconds.
+    """Extract datetime of Alarm expiry.
 
     Args:
-        utterance: Full request, e.g. "set a 30 second timer"
+        utterance: Full request, e.g. "set an alarm for 9 a.m."
 
     Returns
-        The date and time requested (or None if no duration was extracted) and remainder
-        of utterance
+        The date and time requested (or None if no datetime was extracted),
+        and remainder of utterance
     """
     extract_result = extract_datetime(utterance)
     if extract_result is None:
