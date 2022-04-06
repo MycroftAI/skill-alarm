@@ -1152,7 +1152,7 @@ class AlarmSkill(MycroftSkill):
     ####################################################
 
     @skill_api_method
-    def _create_single_test_alarm(self, utterance: str) -> bool:
+    def _create_single_test_alarm(self, utterance: str):
         """For test setup only - create a single alarm.
 
         This replicates `_set_new_alarm` but:
@@ -1165,8 +1165,6 @@ class AlarmSkill(MycroftSkill):
 
         Args:
             utterance: detail of alarm to create
-        Returns:
-            Whether the alarm was successfully created.
         """
         self.change_state("active")
         try:
@@ -1181,7 +1179,6 @@ class AlarmSkill(MycroftSkill):
                 self.active_alarms.append(alarm)
                 self.active_alarms.sort(key=lambda _alarm: _alarm.date_time)
                 self._schedule_next_alarm()
-                # self._save_alarms()
             self.change_state("inactive")
 
     @skill_api_method
@@ -1195,9 +1192,6 @@ class AlarmSkill(MycroftSkill):
 
         It should only be used in Given VK steps as this sets the state of the
         system for the test. It should never be used in a When or Then step.
-
-        Returns:
-            Whether the alarms were cancelled or not.
         """
         self.change_state("active")
         self._stop_beeping()
@@ -1206,7 +1200,6 @@ class AlarmSkill(MycroftSkill):
             self.log.error("Failed to remove all alarms")
             self.change_state("inactive")
         self.cancel_scheduled_event("NextAlarm")
-        # self._save_alarms()
         self._send_alarm_status()
         self.change_state("inactive")
 
