@@ -1,4 +1,4 @@
-Feature: Set a recurring alarm
+Feature: Alarm - Set a recurring alarm
 
   Scenario Outline: user sets a recurring alarm
     Given an english speaking user

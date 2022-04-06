@@ -1,4 +1,4 @@
-Feature: Set a non-recurring alarm
+Feature: Alarm - Set a non-recurring alarm
 
   Scenario Outline: user sets an alarm for a specified time
     Given an english speaking user
