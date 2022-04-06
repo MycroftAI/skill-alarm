@@ -2,12 +2,18 @@ import time
 
 from behave import given, then
 
+from mycroft.util.process_utils import start_message_bus_client
 from mycroft.messagebus.message import Message
 from mycroft.skills.api import SkillApi
 from test.integrationtests.voight_kampff import (
     emit_utterance,
     VoightKampffDialogMatcher,
 )
+
+# Setup Skill API connection
+bus = start_message_bus_client("AlarmTestRunner")
+SkillApi.connect_bus(bus)
+alarm_skill = SkillApi.get("mycroft-alarm.mycroftai")
 
 CANCEL_RESPONSES = (
     "cancelled-multiple",
@@ -19,29 +25,21 @@ CANCEL_RESPONSES = (
 
 @given("an alarm is set for {alarm_time}")
 def given_set_alarm(context, alarm_time):
-    emit_utterance(context.bus, "set an alarm for {}".format(alarm_time))
-    dialog_matcher = VoightKampffDialogMatcher(context, ["alarm-scheduled"])
-    dialog_matcher.match()
-    time.sleep(1)
-    context.bus.clear_messages()
+    pre_alarm_creation = alarm_skill.get_number_of_active_alarms()
+    print(pre_alarm_creation)
+    alarm_skill._create_single_test_alarm("set an alarm for {}".format(alarm_time))
+    post_alarm_creation = alarm_skill.get_number_of_active_alarms()
+    print(post_alarm_creation)
+    time.sleep(0.5)
+    assert post_alarm_creation - pre_alarm_creation == 1
 
 
 @given("no active alarms")
 def reset_alarms(context):
     """Cancel all active timers to test how skill behaves when no timers are set."""
-    time.sleep(2)
-    _cancel_all_alarms(context)
-
-
-def _cancel_all_alarms(context):
-    """Cancel all active alarms.
-
-    If one of the expected responses is not spoken, cause the step to error out.
-    """
-    emit_utterance(context.bus, "cancel all alarms")
-    dialog_matcher = VoightKampffDialogMatcher(context, CANCEL_RESPONSES)
-    match_found, error_message = dialog_matcher.match()
-    assert match_found, error_message
+    alarm_skill._cancel_all_alarms()
+    num_alarms = alarm_skill.get_number_of_active_alarms()
+    assert num_alarms == 0
 
 
 @given("an alarm is expired and beeping")

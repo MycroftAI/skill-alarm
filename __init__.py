@@ -21,7 +21,7 @@ from typing import List, Optional
 
 from mycroft.audio.utils import wait_while_speaking
 from mycroft.messagebus.message import Message
-from mycroft.skills import AdaptIntent, intent_handler, MycroftSkill
+from mycroft.skills import AdaptIntent, intent_handler, MycroftSkill, skill_api_method
 from mycroft.skills.skill_data import RegexExtractor
 from mycroft.util.format import nice_time, join_list, date_time_format
 from mycroft.util.parse import extract_datetime, extract_number
@@ -96,7 +96,11 @@ class AlarmSkill(MycroftSkill):
         self.active_alarms = []
         self.save_path = Path(self.file_system.path).joinpath("saved_alarms")
         self.sound_duration = dict(
-            bell=5, escalate=32, constant_beep=5, beep4=4, chimes=22,
+            bell=5,
+            escalate=32,
+            constant_beep=5,
+            beep4=4,
+            chimes=22,
         )
         self._init_skill_control()
 
@@ -455,8 +459,9 @@ class AlarmSkill(MycroftSkill):
         Raises:
             AlarmValidationException when the user does not supply a date and/or time
         """
-        response = self.get_response("ask-alarm-time",
-                                     validator=self._validate_response_has_datetime)
+        response = self.get_response(
+            "ask-alarm-time", validator=self._validate_response_has_datetime
+        )
         if response is None:
             raise AlarmValidationException("No duration specified")
         else:
@@ -480,8 +485,8 @@ class AlarmSkill(MycroftSkill):
         """
         extracted_dt = extract_datetime(utterance) is not None
         dismissed = any(
-                [word in utterance for word in self.static_resources.dismiss_words]
-            )
+            [word in utterance for word in self.static_resources.dismiss_words]
+        )
         return extracted_dt or dismissed
 
     def _check_for_alarm_in_past(self, utterance: str, alarm_datetime: datetime):
@@ -646,20 +651,24 @@ class AlarmSkill(MycroftSkill):
             utterance: the user's request
         """
         self.change_state("active")
-        if self.active_alarms:
-            matches = self._determine_which_alarms_to_cancel(utterance)
-            if matches is not None:
-                self._cancel_requested_alarms(matches)
-                self._save_alarms()
-                if self.active_alarms:
-                    self._schedule_next_alarm()
-                else:
-                    self.cancel_scheduled_event("NextAlarm")
-                    self._send_alarm_status()
-        else:
-            self.log.info("No active alarms to cancel")
-            self.speak_dialog("no-active-alarms", wait=True)
-        self.change_state("inactive")
+        try:
+            if self.active_alarms:
+                matches = self._determine_which_alarms_to_cancel(utterance)
+                if matches is not None:
+                    self._cancel_requested_alarms(matches)
+                    self._save_alarms()
+                    if self.active_alarms:
+                        self._schedule_next_alarm()
+                    else:
+                        self.cancel_scheduled_event("NextAlarm")
+                        self._send_alarm_status()
+            else:
+                self.log.info("No active alarms to cancel")
+                self.speak_dialog("no-active-alarms", wait=True)
+        except Exception:
+            pass
+        finally:
+            self.change_state("inactive")
 
     def _determine_which_alarms_to_cancel(self, utterance: str) -> List[Alarm]:
         """Determines which alarm(s) match the user's cancel request.
@@ -1137,6 +1146,74 @@ class AlarmSkill(MycroftSkill):
             self.cache_dialog(
                 "ask-which-alarm-delete", data=dialog_data, cache_key=cache_key
             )
+
+    ####################################################
+    #### SKILL API METHODS FOR VOIGHT KAMPF TESTING ####
+    ####################################################
+
+    @skill_api_method
+    def _create_single_test_alarm(self, utterance: str) -> bool:
+        """For test setup only - create a single alarm.
+
+        This replicates `_set_new_alarm` but:
+        - does not speak or display anything
+        - does not save the created alarms to disk
+        - does not pre-cache TTS for follow up queries.
+
+        It should only be used in Given VK steps as this sets the state of the
+        system for the test. It should never be used in a When or Then step.
+
+        Args:
+            utterance: detail of alarm to create
+        Returns:
+            Whether the alarm was successfully created.
+        """
+        self.change_state("active")
+        try:
+            alarm = self._build_alarm(utterance)
+        except AlarmValidationException as exc:
+            self.log.error(str(exc))
+            self.change_state("inactive")
+        else:
+            # alarm datetime should only be None here if the user was asked for
+            # the date and time of the alarm and responded with "nevermind"
+            if alarm.date_time is not None:
+                self.active_alarms.append(alarm)
+                self.active_alarms.sort(key=lambda _alarm: _alarm.date_time)
+                self._schedule_next_alarm()
+                # self._save_alarms()
+            self.change_state("inactive")
+
+    @skill_api_method
+    def _cancel_all_alarms(self):
+        """For test setup only - cancel all alarms that exist.
+
+        This replicates a particular flow of `_cancel_alarms` but:
+        - does not speak or display anything
+        - does not save changes to disk
+        - does not update pre-cached TTS.
+
+        It should only be used in Given VK steps as this sets the state of the
+        system for the test. It should never be used in a When or Then step.
+
+        Returns:
+            Whether the alarms were cancelled or not.
+        """
+        self.change_state("active")
+        self._stop_beeping()
+        self.active_alarms = []
+        if len(self.active_alarms) > 0:
+            self.log.error("Failed to remove all alarms")
+            self.change_state("inactive")
+        self.cancel_scheduled_event("NextAlarm")
+        # self._save_alarms()
+        self._send_alarm_status()
+        self.change_state("inactive")
+
+    @skill_api_method
+    def get_number_of_active_alarms(self) -> int:
+        """Get the number of active alarms."""
+        return len(self.active_alarms)
 
 
 def create_skill():

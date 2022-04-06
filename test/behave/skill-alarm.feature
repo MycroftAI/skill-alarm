@@ -157,6 +157,8 @@ Feature: Alarm skill functionality
     | abort alarm |
     | remove alarm |
 
+  @xfail
+  # JIRA https://mycroft.atlassian.net/browse/SKILL-512
   Scenario Outline: user deletes an alarm when multiple alarms are active
     Given an english speaking user
      And no active alarms
