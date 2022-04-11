@@ -8,14 +8,12 @@ Feature: Alarm - Set a recurring alarm
 
   Examples:
     | set recurring alarm request |
-    | set alarm every weekday at 7:30 am |
     | wake me up every weekday at 7:30 am |
     | set an alarm every wednesday at 11 am |
     | set an alarm for weekends at 3 pm |
     | set an alarm for 3 pm every weekend |
 
-  @xfail
-  # Jira 68 https://mycroft.atlassian.net/browse/MS-68
+  @xfail @cifailonly
   Scenario Outline: Failing user sets a recurring alarm
     Given an english speaking user
      And no active alarms
@@ -25,8 +23,20 @@ Feature: Alarm - Set a recurring alarm
   Examples:
     | set recurring alarm request |
     | set alarm every weekday at 7:30 am |
-    | alarm every weekday at 7:30 am |
     | wake me up every day at 7:30 am except on the weekends |
+
+  @xfail
+  # This is unsupported behaviour. Was the request to create an alarm or check the
+  # status of an existing alarm? It's ambiguous and requires more UX research.
+  Scenario Outline: User mentions an alarm but does not include any verb like 'set'
+    Given an english speaking user
+      And no active alarms
+     When the user says "<recurring alarm request with no verb>"
+     Then "mycroft-alarm" should reply with dialog from "alarm-scheduled-recurring"
+
+  Examples:
+    | recurring alarm request with no verb |
+    | alarm every weekday at 7:30 am |
 
   Scenario Outline: user sets a recurring alarm without saying a time
     Given an english speaking user
