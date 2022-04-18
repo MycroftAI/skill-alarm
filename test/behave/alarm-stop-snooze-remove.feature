@@ -71,7 +71,7 @@ Feature: Alarm - Stop, snooze, and remove
   Scenario Outline: user deletes an alarm when a single alarm is active
     Given an english speaking user
      And no active alarms
-     And an alarm is set for 9:00 am on monday
+     And an alarm is set for 9:00 am tomorrow
      When the user says "<delete alarm>"
      Then "mycroft-alarm" should reply with dialog from "cancelled-single.dialog"
 
@@ -90,8 +90,8 @@ Feature: Alarm - Stop, snooze, and remove
   Scenario Outline: user deletes an alarm when multiple alarms are active
     Given an english speaking user
      And no active alarms
-     And an alarm is set for 9:00 am on monday
-     And an alarm is set for 10:00 pm on friday
+     And an alarm is set for 9:00 am next monday
+     And an alarm is set for 10:00 pm next friday
      When the user says "<delete alarm>"
      Then "mycroft-alarm" should reply with dialog from "ask-which-alarm-delete.dialog"
      And the user says "9:00 am"
@@ -112,8 +112,8 @@ Feature: Alarm - Stop, snooze, and remove
   Scenario Outline: user deletes a specific alarm
     Given an english speaking user
      And no active alarms
-     And an alarm is set for 9:00 am on monday
-     And an alarm is set for 10:00 pm on friday
+     And an alarm is set for 9:00 am next monday
+     And an alarm is set for 10:00 pm next friday
      When the user says "<delete specific alarm>"
      And "mycroft-alarm" should reply with dialog from "cancelled-single.dialog"
 
@@ -130,8 +130,8 @@ Feature: Alarm - Stop, snooze, and remove
   Scenario Outline: user deletes all alarms
     Given an english speaking user
      And no active alarms
-     And an alarm is set for 9:00 am on monday
-     And an alarm is set for 10:00 pm on friday
+     And an alarm is set for 9:00 am next monday
+     And an alarm is set for 10:00 pm next friday
      When the user says "<delete all alarms>"
      Then "mycroft-alarm" should reply with dialog from "cancelled-multiple.dialog"
 
