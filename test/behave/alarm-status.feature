@@ -45,7 +45,7 @@ Feature: Alarm - Check status
     Given an english speaking user
      And no active alarms
      And an alarm is set for 9:00 am on weekdays
-     And an alarm is set for 6:00 pm on wednesday
+     And an alarm is set for 6:00 pm next wednesday
      When the user says "<alarm status>"
      Then "mycroft-alarm" should reply with dialog from "multiple-active-alarms.dialog"
 
