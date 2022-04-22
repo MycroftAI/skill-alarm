@@ -9,7 +9,6 @@ Feature: Alarm - Set a recurring alarm
   Examples:
     | set recurring alarm request |
     | wake me up every weekday at 7:30 am |
-    | set an alarm every wednesday at 11 am |
     | set an alarm for weekends at 3 pm |
     | set an alarm for 3 pm every weekend |
 
@@ -23,6 +22,7 @@ Feature: Alarm - Set a recurring alarm
   Examples:
     | set recurring alarm request |
     | set alarm every weekday at 7:30 am |
+    | set an alarm every wednesday at 11 am |
     | wake me up every day at 7:30 am except on the weekends |
 
   @xfail
