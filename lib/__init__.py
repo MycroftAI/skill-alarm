@@ -19,6 +19,6 @@ from .alarm import (
     get_next_repeat,
     has_expired_alarm,
 )
-from .format import nice_relative_time
+from mycroft.util.format import nice_relative_time
 from .parse import fuzzy_match, utterance_has_midnight
 from .recur import create_day_set, create_recurring_rule, describe_recurrence
