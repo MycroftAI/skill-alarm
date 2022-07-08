@@ -23,6 +23,7 @@ from adapt.intent import IntentBuilder
 from mycroft import MycroftSkill, intent_handler
 from mycroft.configuration.config import LocalConf, USER_CONFIG
 from mycroft.messagebus.message import Message
+from mycroft.skills import skill_api_method
 from mycroft.util import play_mp3
 from mycroft.util.format import nice_date_time, nice_time, nice_date, join_list, nice_relative_time
 from mycroft.util.parse import extract_datetime, extract_number
@@ -45,6 +46,8 @@ from .lib.recur import (
     describe_repeat_rule,
 )
 
+MARK_II = "mycroft_mark_2"
+USE_24_HOUR = "full"
 
 # WORKING PHRASES/SEQUENCES:
 # Set an alarm
@@ -159,13 +162,27 @@ class AlarmSkill(MycroftSkill):
 
         self._schedule()
 
-        # Support query for active alarms from other skills
+        # TODO: remove the "private.mycroftai.has_alarm" event in favor of the
+        #   "skill.alarm.query-active" event.
         self.add_event("private.mycroftai.has_alarm", self.on_has_alarm)
+        self.add_event("skill.alarm.query-active", self.handle_active_alarm_query)
 
+    # TODO: remove the "private.mycroftai.has_alarm" event in favor of the
+    #   "skill.alarm.query-active" event.
     def on_has_alarm(self, message):
         """Reply to requests for alarm on/off status."""
         total = len(self.settings["alarm"])
         self.bus.emit(message.response(data={"active_alarms": total}))
+
+    def handle_active_alarm_query(self, message):
+        """Emits an event indicating whether or not there are any active alarms.
+
+        In this case, an "active alarm" is defined as any alarms that exist for a time
+        in the future.
+        """
+        event_data = {"active_alarms": bool(self.settings["alarm"])}
+        event = message.response(data=event_data)
+        self.bus.emit(event)
 
     def set_alarm(self, when, name=None, repeat=None):
         """Set an alarm at the specified datetime."""
@@ -204,6 +221,9 @@ class AlarmSkill(MycroftSkill):
             self.schedule_event(
                 self._alarm_expired, to_system(alarm_dt), name="NextAlarm"
             )
+        event_data = {"active_alarms": bool(self.settings["alarm"])}
+        event = Message("skill.alarm.scheduled", data=event_data)
+        self.bus.emit(event)
 
     def _get_recurrence(self, utterance: str):
         """Get recurrence pattern from user utterance."""
@@ -374,6 +394,7 @@ class AlarmSkill(MycroftSkill):
                     data={"time": alarm_nice_time, "rel": reltime},
                 )
 
+        self._show_alarm_ui(alarm_time, name)
         self._show_alarm_anim(alarm_time)
         self.enclosure.activate_mouth_events()
 
@@ -397,7 +418,7 @@ class AlarmSkill(MycroftSkill):
                 if res:
                     try:
                         name = res.group("Name").strip()
-                        self.log.debug("Regex name extracted: {}".format(name))
+                        self.log.info("Regex name extracted: {}".format(name))
                         if name and len(name.strip()) > 0 and name not in invalid_names:
                             return name.lower()
                     except IndexError:
@@ -706,6 +727,7 @@ class AlarmSkill(MycroftSkill):
                 self.speak_dialog(
                     "alarm.cancelled.desc" + recurring, data={"desc": desc}
                 )
+                self.gui.release()
                 return
             else:
                 self.speak_dialog("alarm.delete.cancelled")
@@ -722,6 +744,7 @@ class AlarmSkill(MycroftSkill):
                 ]
                 self._schedule()
                 self.speak_dialog("alarm.cancelled.multi", data={"count": total})
+                self.gui.release()
             return
         elif not total:
             # Failed to delete
@@ -899,6 +922,7 @@ class AlarmSkill(MycroftSkill):
             self.settings["alarm"] = curate_alarms(
                 self.settings["alarm"], 0
             )  # end any expired alarm
+            self.gui.release()
             self._schedule()
             return True
         else:
@@ -936,6 +960,10 @@ class AlarmSkill(MycroftSkill):
             name="Flash",
             data={"alarm_time": alarm["timestamp"]},
         )
+        alarm_timestamp = alarm.get("timestamp", "")
+        alarm_dt = get_alarm_local(timestamp=alarm_timestamp)
+        alarm_name = alarm.get("name", "")
+        self._show_alarm_ui(alarm_dt, alarm_name, alarm_exp=True)
 
     def __end_flash(self):
         self.cancel_scheduled_event("Flash")
@@ -1008,6 +1036,58 @@ class AlarmSkill(MycroftSkill):
             png = join(abspath(dirname(__file__)), "anim", png)
             self.enclosure.mouth_display_png(png, x=x, y=2, refresh=False)
             x += w
+
+    def _show_alarm_ui(self, alarm_dt, alarm_name, alarm_exp=False):
+        if self.config_core.get("time_format") == USE_24_HOUR:
+            self.gui["alarmTime"] = nice_time(alarm_dt, speech=False,
+                                              use_ampm=False)
+            self.gui["alarmAmPm"] = ""
+        else:
+            alarm_time = nice_time(alarm_dt, speech=False, use_ampm=True)
+            self.gui["alarmTime"], self.gui["alarmAmPm"] = alarm_time.split()
+        self.gui["alarmName"] = alarm_name.title()
+        self.gui["alarmExpired"] = alarm_exp
+        override_idle = True if alarm_exp else False
+        platform = self.config_core['enclosure'].get('platform', 'unknown')
+        if platform == MARK_II:
+            page_name = "alarm_mark_ii.qml"
+        else:
+            page_name = "alarm_scalable.qml"
+        self.gui.show_page(page_name, override_idle=override_idle)
+
+    ##########################################################################
+    # Public Skill API Methods
+
+    @skill_api_method
+    def delete_all_alarms(self):
+        """Delete all stored alarms."""
+        if len(self.settings["alarm"]) > 0:
+            self.settings["alarm"] = []
+            self._schedule()
+            return True
+        else:
+            return False
+
+    @skill_api_method
+    def get_active_alarms(self):
+        """Get list of active alarms.
+
+        This includes any alarms that are in an expired state.
+
+        Returns:
+            List of alarms as Objects: {
+                "timestamp" (float): POSIX timestamp of next alarm expiry
+                "repeat_rule" (str): iCal repeat rule
+                "name" (str): Alarm name
+                "snooze" (float): [optional] POSIX timestamp if alarm was snoozed
+            }
+        """
+        return self.settings["alarm"]
+
+    @skill_api_method
+    def is_alarm_expired(self):
+        """Check if an alarm is currently expired and beeping."""
+        return has_expired_alarm(self.settings["alarm"])
 
 
 def create_skill():
